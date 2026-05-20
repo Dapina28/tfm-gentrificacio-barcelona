@@ -1,0 +1,516 @@
+Any,Nom_Districte,Nom_Barri,n_llicencies
+2018,CIUTAT VELLA,"Sant Pere, Santa Caterina i la Ribera",168
+2018,CIUTAT VELLA,el Barri Gòtic,194
+2018,CIUTAT VELLA,el Raval,178
+2018,CIUTAT VELLA,la Barceloneta,66
+2018,GRACIA,Vallcarca i els Penitents,40
+2018,GRACIA,el Camp d'en Grassot i Gràcia Nova,227
+2018,GRACIA,el Coll,20
+2018,GRACIA,la Salut,37
+2018,GRACIA,la Vila de Gràcia,753
+2018,HORTA-GUINARDÓ,Can Baró,20
+2018,HORTA-GUINARDÓ,Horta,6
+2018,HORTA-GUINARDÓ,Sant Genís dels Agudells,4
+2018,HORTA-GUINARDÓ,el Baix Guinardó,106
+2018,HORTA-GUINARDÓ,el Carmel,33
+2018,HORTA-GUINARDÓ,el Guinardó,70
+2018,HORTA-GUINARDÓ,la Font d'en Fargues,4
+2018,HORTA-GUINARDÓ,la Teixonera,9
+2018,HORTA-GUINARDÓ,la Vall d'Hebron,1
+2018,L'EIXAMPLE,Sant Antoni,587
+2018,L'EIXAMPLE,el Fort Pienc,331
+2018,L'EIXAMPLE,l'Antiga Esquerra de l'Eixample,708
+2018,L'EIXAMPLE,la Dreta de l'Eixample,1664
+2018,L'EIXAMPLE,la Nova Esquerra de l'Eixample,413
+2018,L'EIXAMPLE,la Sagrada Família,768
+2018,LES CORTS,Pedralbes,11
+2018,LES CORTS,la Maternitat i Sant Ramon,46
+2018,LES CORTS,les Corts,209
+2018,NOU BARRIS,Canyelles,1
+2018,NOU BARRIS,Porta,2
+2018,NOU BARRIS,Verdun,3
+2018,NOU BARRIS,Vilapicina i la Torre Llobeta,9
+2018,NOU BARRIS,la Guineueta,1
+2018,NOU BARRIS,la Prosperitat,3
+2018,NOU BARRIS,les Roquetes,2
+2018,SANT ANDREU,Navas,17
+2018,SANT ANDREU,Sant Andreu,28
+2018,SANT ANDREU,el Bon Pastor,1
+2018,SANT ANDREU,el Congrés i els Indians,6
+2018,SANT ANDREU,la Sagrera,22
+2018,SANT ANDREU,la Trinitat Vella,4
+2018,SANT MARTI,Diagonal Mar i el Front Marítim del Poblenou,128
+2018,SANT MARTI,Provençals del Poblenou,34
+2018,SANT MARTI,Sant Martí de Provençals,15
+2018,SANT MARTI,el Besòs i el Maresme,32
+2018,SANT MARTI,el Camp de l'Arpa del Clot,265
+2018,SANT MARTI,el Clot,50
+2018,SANT MARTI,el Parc i la Llacuna del Poblenou,101
+2018,SANT MARTI,el Poblenou,389
+2018,SANT MARTI,la Verneda i la Pau,9
+2018,SANT MARTI,la Vila Olímpica del Poblenou,108
+2018,SANTS-MONTJUÏC,Hostafrancs,177
+2018,SANTS-MONTJUÏC,Sants,245
+2018,SANTS-MONTJUÏC,Sants - Badal,106
+2018,SANTS-MONTJUÏC,el Poble-sec,517
+2018,SANTS-MONTJUÏC,la Bordeta,44
+2018,SANTS-MONTJUÏC,la Font de la Guatlla,73
+2018,SANTS-MONTJUÏC,la Marina de Port,7
+2018,SANTS-MONTJUÏC,la Marina del Prat Vermell,3
+2018,SARRIA-SANT GERVASI,Sant Gervasi - Galvany,244
+2018,SARRIA-SANT GERVASI,Sant Gervasi - la Bonanova,32
+2018,SARRIA-SANT GERVASI,Sarrià,27
+2018,SARRIA-SANT GERVASI,"Vallvidrera, el Tibidabo i les Planes",3
+2018,SARRIA-SANT GERVASI,el Putxet i el Farró,155
+2018,SARRIA-SANT GERVASI,les Tres Torres,35
+2019,CIUTAT VELLA,"Sant Pere, Santa Caterina i la Ribera",160
+2019,CIUTAT VELLA,el Barri Gòtic,193
+2019,CIUTAT VELLA,el Raval,194
+2019,CIUTAT VELLA,la Barceloneta,60
+2019,GRACIA,Vallcarca i els Penitents,40
+2019,GRACIA,el Camp d'en Grassot i Gràcia Nova,224
+2019,GRACIA,el Coll,20
+2019,GRACIA,la Salut,37
+2019,GRACIA,la Vila de Gràcia,752
+2019,HORTA-GUINARDÓ,Can Baró,20
+2019,HORTA-GUINARDÓ,Horta,6
+2019,HORTA-GUINARDÓ,Sant Genís dels Agudells,3
+2019,HORTA-GUINARDÓ,el Baix Guinardó,106
+2019,HORTA-GUINARDÓ,el Carmel,33
+2019,HORTA-GUINARDÓ,el Guinardó,70
+2019,HORTA-GUINARDÓ,la Font d'en Fargues,4
+2019,HORTA-GUINARDÓ,la Teixonera,9
+2019,HORTA-GUINARDÓ,la Vall d'Hebron,1
+2019,L'EIXAMPLE,Sant Antoni,586
+2019,L'EIXAMPLE,el Fort Pienc,332
+2019,L'EIXAMPLE,l'Antiga Esquerra de l'Eixample,710
+2019,L'EIXAMPLE,la Dreta de l'Eixample,1660
+2019,L'EIXAMPLE,la Nova Esquerra de l'Eixample,413
+2019,L'EIXAMPLE,la Sagrada Família,768
+2019,LES CORTS,Pedralbes,11
+2019,LES CORTS,la Maternitat i Sant Ramon,46
+2019,LES CORTS,les Corts,208
+2019,NOU BARRIS,Canyelles,1
+2019,NOU BARRIS,Porta,10
+2019,NOU BARRIS,Verdun,3
+2019,NOU BARRIS,Vilapicina i la Torre Llobeta,9
+2019,NOU BARRIS,la Guineueta,1
+2019,NOU BARRIS,la Prosperitat,3
+2019,NOU BARRIS,les Roquetes,2
+2019,SANT ANDREU,Navas,17
+2019,SANT ANDREU,Sant Andreu,28
+2019,SANT ANDREU,el Bon Pastor,1
+2019,SANT ANDREU,el Congrés i els Indians,6
+2019,SANT ANDREU,la Sagrera,22
+2019,SANT ANDREU,la Trinitat Vella,4
+2019,SANT MARTI,Diagonal Mar i el Front Marítim del Poblenou,128
+2019,SANT MARTI,Provençals del Poblenou,34
+2019,SANT MARTI,Sant Martí de Provençals,15
+2019,SANT MARTI,el Besòs i el Maresme,32
+2019,SANT MARTI,el Camp de l'Arpa del Clot,266
+2019,SANT MARTI,el Clot,50
+2019,SANT MARTI,el Parc i la Llacuna del Poblenou,101
+2019,SANT MARTI,el Poblenou,389
+2019,SANT MARTI,la Verneda i la Pau,9
+2019,SANT MARTI,la Vila Olímpica del Poblenou,108
+2019,SANTS-MONTJUÏC,Hostafrancs,177
+2019,SANTS-MONTJUÏC,Sants,245
+2019,SANTS-MONTJUÏC,Sants - Badal,106
+2019,SANTS-MONTJUÏC,el Poble-sec,517
+2019,SANTS-MONTJUÏC,la Bordeta,44
+2019,SANTS-MONTJUÏC,la Font de la Guatlla,73
+2019,SANTS-MONTJUÏC,la Marina de Port,7
+2019,SANTS-MONTJUÏC,la Marina del Prat Vermell,3
+2019,SARRIA-SANT GERVASI,Sant Gervasi - Galvany,244
+2019,SARRIA-SANT GERVASI,Sant Gervasi - la Bonanova,32
+2019,SARRIA-SANT GERVASI,Sarrià,27
+2019,SARRIA-SANT GERVASI,"Vallvidrera, el Tibidabo i les Planes",3
+2019,SARRIA-SANT GERVASI,el Putxet i el Farró,143
+2019,SARRIA-SANT GERVASI,les Tres Torres,35
+2020,CIUTAT VELLA,"Sant Pere, Santa Caterina i la Ribera",159
+2020,CIUTAT VELLA,el Barri Gòtic,193
+2020,CIUTAT VELLA,el Raval,191
+2020,CIUTAT VELLA,la Barceloneta,64
+2020,GRACIA,Vallcarca i els Penitents,40
+2020,GRACIA,el Camp d'en Grassot i Gràcia Nova,223
+2020,GRACIA,el Coll,20
+2020,GRACIA,la Salut,37
+2020,GRACIA,la Vila de Gràcia,747
+2020,HORTA-GUINARDÓ,Can Baró,20
+2020,HORTA-GUINARDÓ,Horta,6
+2020,HORTA-GUINARDÓ,Sant Genís dels Agudells,3
+2020,HORTA-GUINARDÓ,el Baix Guinardó,92
+2020,HORTA-GUINARDÓ,el Carmel,33
+2020,HORTA-GUINARDÓ,el Guinardó,71
+2020,HORTA-GUINARDÓ,la Font d'en Fargues,4
+2020,HORTA-GUINARDÓ,la Teixonera,9
+2020,HORTA-GUINARDÓ,la Vall d'Hebron,1
+2020,L'EIXAMPLE,Sant Antoni,585
+2020,L'EIXAMPLE,el Fort Pienc,332
+2020,L'EIXAMPLE,l'Antiga Esquerra de l'Eixample,712
+2020,L'EIXAMPLE,la Dreta de l'Eixample,1663
+2020,L'EIXAMPLE,la Nova Esquerra de l'Eixample,413
+2020,L'EIXAMPLE,la Sagrada Família,765
+2020,LES CORTS,Pedralbes,11
+2020,LES CORTS,la Maternitat i Sant Ramon,44
+2020,LES CORTS,les Corts,206
+2020,NOU BARRIS,Canyelles,1
+2020,NOU BARRIS,Porta,10
+2020,NOU BARRIS,Verdun,3
+2020,NOU BARRIS,Vilapicina i la Torre Llobeta,9
+2020,NOU BARRIS,la Guineueta,1
+2020,NOU BARRIS,la Prosperitat,3
+2020,NOU BARRIS,les Roquetes,2
+2020,SANT ANDREU,Navas,16
+2020,SANT ANDREU,Sant Andreu,28
+2020,SANT ANDREU,el Bon Pastor,1
+2020,SANT ANDREU,el Congrés i els Indians,6
+2020,SANT ANDREU,la Sagrera,22
+2020,SANT ANDREU,la Trinitat Vella,4
+2020,SANT MARTI,Diagonal Mar i el Front Marítim del Poblenou,127
+2020,SANT MARTI,Provençals del Poblenou,34
+2020,SANT MARTI,Sant Martí de Provençals,15
+2020,SANT MARTI,el Besòs i el Maresme,32
+2020,SANT MARTI,el Camp de l'Arpa del Clot,266
+2020,SANT MARTI,el Clot,50
+2020,SANT MARTI,el Parc i la Llacuna del Poblenou,98
+2020,SANT MARTI,el Poblenou,390
+2020,SANT MARTI,la Verneda i la Pau,9
+2020,SANT MARTI,la Vila Olímpica del Poblenou,108
+2020,SANTS-MONTJUÏC,Hostafrancs,177
+2020,SANTS-MONTJUÏC,Sants,245
+2020,SANTS-MONTJUÏC,Sants - Badal,107
+2020,SANTS-MONTJUÏC,el Poble-sec,515
+2020,SANTS-MONTJUÏC,la Bordeta,44
+2020,SANTS-MONTJUÏC,la Font de la Guatlla,73
+2020,SANTS-MONTJUÏC,la Marina de Port,6
+2020,SANTS-MONTJUÏC,la Marina del Prat Vermell,3
+2020,SARRIA-SANT GERVASI,Sant Gervasi - Galvany,244
+2020,SARRIA-SANT GERVASI,Sant Gervasi - la Bonanova,32
+2020,SARRIA-SANT GERVASI,Sarrià,27
+2020,SARRIA-SANT GERVASI,"Vallvidrera, el Tibidabo i les Planes",3
+2020,SARRIA-SANT GERVASI,el Putxet i el Farró,143
+2020,SARRIA-SANT GERVASI,les Tres Torres,35
+2021,CIUTAT VELLA,"Sant Pere, Santa Caterina i la Ribera",159
+2021,CIUTAT VELLA,el Barri Gòtic,193
+2021,CIUTAT VELLA,el Raval,189
+2021,CIUTAT VELLA,la Barceloneta,64
+2021,GRACIA,Vallcarca i els Penitents,40
+2021,GRACIA,el Camp d'en Grassot i Gràcia Nova,221
+2021,GRACIA,el Coll,20
+2021,GRACIA,la Salut,36
+2021,GRACIA,la Vila de Gràcia,734
+2021,HORTA-GUINARDÓ,Can Baró,20
+2021,HORTA-GUINARDÓ,Horta,6
+2021,HORTA-GUINARDÓ,Sant Genís dels Agudells,3
+2021,HORTA-GUINARDÓ,el Baix Guinardó,76
+2021,HORTA-GUINARDÓ,el Carmel,31
+2021,HORTA-GUINARDÓ,el Guinardó,70
+2021,HORTA-GUINARDÓ,la Font d'en Fargues,4
+2021,HORTA-GUINARDÓ,la Teixonera,7
+2021,HORTA-GUINARDÓ,la Vall d'Hebron,1
+2021,L'EIXAMPLE,Sant Antoni,577
+2021,L'EIXAMPLE,el Fort Pienc,330
+2021,L'EIXAMPLE,l'Antiga Esquerra de l'Eixample,688
+2021,L'EIXAMPLE,la Dreta de l'Eixample,1650
+2021,L'EIXAMPLE,la Nova Esquerra de l'Eixample,404
+2021,L'EIXAMPLE,la Sagrada Família,755
+2021,LES CORTS,Pedralbes,11
+2021,LES CORTS,la Maternitat i Sant Ramon,44
+2021,LES CORTS,les Corts,202
+2021,NOU BARRIS,Canyelles,1
+2021,NOU BARRIS,Porta,10
+2021,NOU BARRIS,Verdun,3
+2021,NOU BARRIS,Vilapicina i la Torre Llobeta,9
+2021,NOU BARRIS,la Guineueta,1
+2021,NOU BARRIS,la Prosperitat,3
+2021,NOU BARRIS,les Roquetes,2
+2021,SANT ANDREU,Navas,16
+2021,SANT ANDREU,Sant Andreu,27
+2021,SANT ANDREU,el Bon Pastor,1
+2021,SANT ANDREU,el Congrés i els Indians,6
+2021,SANT ANDREU,la Sagrera,22
+2021,SANT ANDREU,la Trinitat Vella,4
+2021,SANT MARTI,Diagonal Mar i el Front Marítim del Poblenou,126
+2021,SANT MARTI,Provençals del Poblenou,32
+2021,SANT MARTI,Sant Martí de Provençals,14
+2021,SANT MARTI,el Besòs i el Maresme,32
+2021,SANT MARTI,el Camp de l'Arpa del Clot,266
+2021,SANT MARTI,el Clot,49
+2021,SANT MARTI,el Parc i la Llacuna del Poblenou,98
+2021,SANT MARTI,el Poblenou,388
+2021,SANT MARTI,la Verneda i la Pau,9
+2021,SANT MARTI,la Vila Olímpica del Poblenou,107
+2021,SANTS-MONTJUÏC,Hostafrancs,175
+2021,SANTS-MONTJUÏC,Sants,244
+2021,SANTS-MONTJUÏC,Sants - Badal,103
+2021,SANTS-MONTJUÏC,el Poble-sec,498
+2021,SANTS-MONTJUÏC,la Bordeta,42
+2021,SANTS-MONTJUÏC,la Font de la Guatlla,73
+2021,SANTS-MONTJUÏC,la Marina de Port,6
+2021,SANTS-MONTJUÏC,la Marina del Prat Vermell,3
+2021,SARRIA-SANT GERVASI,Sant Gervasi - Galvany,242
+2021,SARRIA-SANT GERVASI,Sant Gervasi - la Bonanova,32
+2021,SARRIA-SANT GERVASI,Sarrià,26
+2021,SARRIA-SANT GERVASI,"Vallvidrera, el Tibidabo i les Planes",3
+2021,SARRIA-SANT GERVASI,el Putxet i el Farró,154
+2021,SARRIA-SANT GERVASI,les Tres Torres,35
+2022,CIUTAT VELLA,"Sant Pere, Santa Caterina i la Ribera",159
+2022,CIUTAT VELLA,el Barri Gòtic,194
+2022,CIUTAT VELLA,el Raval,199
+2022,CIUTAT VELLA,la Barceloneta,64
+2022,GRACIA,Vallcarca i els Penitents,39
+2022,GRACIA,el Camp d'en Grassot i Gràcia Nova,220
+2022,GRACIA,el Coll,20
+2022,GRACIA,la Salut,36
+2022,GRACIA,la Vila de Gràcia,725
+2022,HORTA-GUINARDÓ,Can Baró,20
+2022,HORTA-GUINARDÓ,Horta,6
+2022,HORTA-GUINARDÓ,Sant Genís dels Agudells,3
+2022,HORTA-GUINARDÓ,el Baix Guinardó,73
+2022,HORTA-GUINARDÓ,el Carmel,32
+2022,HORTA-GUINARDÓ,el Guinardó,70
+2022,HORTA-GUINARDÓ,la Font d'en Fargues,4
+2022,HORTA-GUINARDÓ,la Teixonera,6
+2022,HORTA-GUINARDÓ,la Vall d'Hebron,1
+2022,L'EIXAMPLE,Sant Antoni,554
+2022,L'EIXAMPLE,el Fort Pienc,328
+2022,L'EIXAMPLE,l'Antiga Esquerra de l'Eixample,670
+2022,L'EIXAMPLE,la Dreta de l'Eixample,1631
+2022,L'EIXAMPLE,la Nova Esquerra de l'Eixample,520
+2022,L'EIXAMPLE,la Sagrada Família,750
+2022,LES CORTS,Pedralbes,11
+2022,LES CORTS,la Maternitat i Sant Ramon,44
+2022,LES CORTS,les Corts,201
+2022,NOU BARRIS,Canyelles,1
+2022,NOU BARRIS,Porta,10
+2022,NOU BARRIS,Verdun,3
+2022,NOU BARRIS,Vilapicina i la Torre Llobeta,9
+2022,NOU BARRIS,la Guineueta,1
+2022,NOU BARRIS,la Prosperitat,3
+2022,NOU BARRIS,les Roquetes,2
+2022,SANT ANDREU,Navas,16
+2022,SANT ANDREU,Sant Andreu,27
+2022,SANT ANDREU,el Bon Pastor,1
+2022,SANT ANDREU,el Congrés i els Indians,6
+2022,SANT ANDREU,la Sagrera,22
+2022,SANT ANDREU,la Trinitat Vella,4
+2022,SANT MARTI,Diagonal Mar i el Front Marítim del Poblenou,125
+2022,SANT MARTI,Provençals del Poblenou,31
+2022,SANT MARTI,Sant Martí de Provençals,14
+2022,SANT MARTI,el Besòs i el Maresme,32
+2022,SANT MARTI,el Camp de l'Arpa del Clot,267
+2022,SANT MARTI,el Clot,46
+2022,SANT MARTI,el Parc i la Llacuna del Poblenou,98
+2022,SANT MARTI,el Poblenou,386
+2022,SANT MARTI,la Verneda i la Pau,9
+2022,SANT MARTI,la Vila Olímpica del Poblenou,105
+2022,SANTS-MONTJUÏC,Hostafrancs,174
+2022,SANTS-MONTJUÏC,Sants,243
+2022,SANTS-MONTJUÏC,Sants - Badal,97
+2022,SANTS-MONTJUÏC,el Poble-sec,487
+2022,SANTS-MONTJUÏC,la Bordeta,30
+2022,SANTS-MONTJUÏC,la Font de la Guatlla,73
+2022,SANTS-MONTJUÏC,la Marina de Port,6
+2022,SANTS-MONTJUÏC,la Marina del Prat Vermell,3
+2022,SARRIA-SANT GERVASI,Sant Gervasi - Galvany,239
+2022,SARRIA-SANT GERVASI,Sant Gervasi - la Bonanova,36
+2022,SARRIA-SANT GERVASI,Sarrià,26
+2022,SARRIA-SANT GERVASI,"Vallvidrera, el Tibidabo i les Planes",3
+2022,SARRIA-SANT GERVASI,el Putxet i el Farró,154
+2022,SARRIA-SANT GERVASI,les Tres Torres,33
+2023,CIUTAT VELLA,"Sant Pere, Santa Caterina i la Ribera",179
+2023,CIUTAT VELLA,el Barri Gòtic,202
+2023,CIUTAT VELLA,el Raval,213
+2023,CIUTAT VELLA,la Barceloneta,97
+2023,GRACIA,Vallcarca i els Penitents,39
+2023,GRACIA,el Camp d'en Grassot i Gràcia Nova,223
+2023,GRACIA,el Coll,20
+2023,GRACIA,la Salut,37
+2023,GRACIA,la Vila de Gràcia,762
+2023,HORTA-GUINARDÓ,Can Baró,20
+2023,HORTA-GUINARDÓ,Horta,6
+2023,HORTA-GUINARDÓ,Sant Genís dels Agudells,4
+2023,HORTA-GUINARDÓ,el Baix Guinardó,83
+2023,HORTA-GUINARDÓ,el Carmel,32
+2023,HORTA-GUINARDÓ,el Guinardó,74
+2023,HORTA-GUINARDÓ,la Font d'en Fargues,4
+2023,HORTA-GUINARDÓ,la Teixonera,5
+2023,HORTA-GUINARDÓ,la Vall d'Hebron,1
+2023,L'EIXAMPLE,Sant Antoni,566
+2023,L'EIXAMPLE,el Fort Pienc,347
+2023,L'EIXAMPLE,l'Antiga Esquerra de l'Eixample,678
+2023,L'EIXAMPLE,la Dreta de l'Eixample,1660
+2023,L'EIXAMPLE,la Nova Esquerra de l'Eixample,487
+2023,L'EIXAMPLE,la Sagrada Família,750
+2023,LES CORTS,Pedralbes,11
+2023,LES CORTS,la Maternitat i Sant Ramon,48
+2023,LES CORTS,les Corts,210
+2023,NOU BARRIS,Canyelles,1
+2023,NOU BARRIS,Porta,12
+2023,NOU BARRIS,Verdun,3
+2023,NOU BARRIS,Vilapicina i la Torre Llobeta,17
+2023,NOU BARRIS,el Turó de la Peira,1
+2023,NOU BARRIS,la Guineueta,1
+2023,NOU BARRIS,la Prosperitat,3
+2023,NOU BARRIS,les Roquetes,2
+2023,SANT ANDREU,Navas,22
+2023,SANT ANDREU,Sant Andreu,33
+2023,SANT ANDREU,el Bon Pastor,2
+2023,SANT ANDREU,el Congrés i els Indians,6
+2023,SANT ANDREU,la Sagrera,22
+2023,SANT ANDREU,la Trinitat Vella,5
+2023,SANT MARTI,Diagonal Mar i el Front Marítim del Poblenou,126
+2023,SANT MARTI,Provençals del Poblenou,33
+2023,SANT MARTI,Sant Martí de Provençals,14
+2023,SANT MARTI,el Besòs i el Maresme,32
+2023,SANT MARTI,el Camp de l'Arpa del Clot,292
+2023,SANT MARTI,el Clot,53
+2023,SANT MARTI,el Parc i la Llacuna del Poblenou,102
+2023,SANT MARTI,el Poblenou,433
+2023,SANT MARTI,la Verneda i la Pau,9
+2023,SANT MARTI,la Vila Olímpica del Poblenou,106
+2023,SANTS-MONTJUÏC,Hostafrancs,177
+2023,SANTS-MONTJUÏC,Sants,238
+2023,SANTS-MONTJUÏC,Sants - Badal,97
+2023,SANTS-MONTJUÏC,el Poble-sec,513
+2023,SANTS-MONTJUÏC,la Bordeta,30
+2023,SANTS-MONTJUÏC,la Font de la Guatlla,131
+2023,SANTS-MONTJUÏC,la Marina de Port,6
+2023,SANTS-MONTJUÏC,la Marina del Prat Vermell,3
+2023,SARRIA-SANT GERVASI,Sant Gervasi - Galvany,293
+2023,SARRIA-SANT GERVASI,Sant Gervasi - la Bonanova,68
+2023,SARRIA-SANT GERVASI,Sarrià,31
+2023,SARRIA-SANT GERVASI,"Vallvidrera, el Tibidabo i les Planes",3
+2023,SARRIA-SANT GERVASI,el Putxet i el Farró,200
+2023,SARRIA-SANT GERVASI,les Tres Torres,34
+2024,CIUTAT VELLA,"Sant Pere, Santa Caterina i la Ribera",200
+2024,CIUTAT VELLA,el Barri Gòtic,218
+2024,CIUTAT VELLA,el Raval,240
+2024,CIUTAT VELLA,la Barceloneta,118
+2024,GRACIA,Vallcarca i els Penitents,39
+2024,GRACIA,el Camp d'en Grassot i Gràcia Nova,225
+2024,GRACIA,el Coll,20
+2024,GRACIA,la Salut,37
+2024,GRACIA,la Vila de Gràcia,799
+2024,HORTA-GUINARDÓ,Can Baró,25
+2024,HORTA-GUINARDÓ,Horta,6
+2024,HORTA-GUINARDÓ,Sant Genís dels Agudells,4
+2024,HORTA-GUINARDÓ,el Baix Guinardó,88
+2024,HORTA-GUINARDÓ,el Carmel,34
+2024,HORTA-GUINARDÓ,el Guinardó,74
+2024,HORTA-GUINARDÓ,la Font d'en Fargues,4
+2024,HORTA-GUINARDÓ,la Teixonera,5
+2024,HORTA-GUINARDÓ,la Vall d'Hebron,1
+2024,L'EIXAMPLE,Sant Antoni,607
+2024,L'EIXAMPLE,el Fort Pienc,374
+2024,L'EIXAMPLE,l'Antiga Esquerra de l'Eixample,719
+2024,L'EIXAMPLE,la Dreta de l'Eixample,1745
+2024,L'EIXAMPLE,la Nova Esquerra de l'Eixample,509
+2024,L'EIXAMPLE,la Sagrada Família,818
+2024,LES CORTS,Pedralbes,11
+2024,LES CORTS,la Maternitat i Sant Ramon,48
+2024,LES CORTS,les Corts,202
+2024,NOU BARRIS,Canyelles,2
+2024,NOU BARRIS,Porta,12
+2024,NOU BARRIS,Verdun,3
+2024,NOU BARRIS,Vilapicina i la Torre Llobeta,17
+2024,NOU BARRIS,el Turó de la Peira,1
+2024,NOU BARRIS,la Guineueta,1
+2024,NOU BARRIS,la Prosperitat,3
+2024,NOU BARRIS,les Roquetes,2
+2024,SANT ANDREU,Navas,25
+2024,SANT ANDREU,Sant Andreu,34
+2024,SANT ANDREU,el Bon Pastor,2
+2024,SANT ANDREU,el Congrés i els Indians,6
+2024,SANT ANDREU,la Sagrera,23
+2024,SANT ANDREU,la Trinitat Vella,5
+2024,SANT MARTI,Diagonal Mar i el Front Marítim del Poblenou,129
+2024,SANT MARTI,Provençals del Poblenou,35
+2024,SANT MARTI,Sant Martí de Provençals,14
+2024,SANT MARTI,el Besòs i el Maresme,32
+2024,SANT MARTI,el Camp de l'Arpa del Clot,295
+2024,SANT MARTI,el Clot,52
+2024,SANT MARTI,el Parc i la Llacuna del Poblenou,102
+2024,SANT MARTI,el Poblenou,455
+2024,SANT MARTI,la Verneda i la Pau,9
+2024,SANT MARTI,la Vila Olímpica del Poblenou,106
+2024,SANTS-MONTJUÏC,Hostafrancs,176
+2024,SANTS-MONTJUÏC,Sants,245
+2024,SANTS-MONTJUÏC,Sants - Badal,99
+2024,SANTS-MONTJUÏC,el Poble-sec,538
+2024,SANTS-MONTJUÏC,la Bordeta,35
+2024,SANTS-MONTJUÏC,la Font de la Guatlla,132
+2024,SANTS-MONTJUÏC,la Marina de Port,6
+2024,SANTS-MONTJUÏC,la Marina del Prat Vermell,3
+2024,SARRIA-SANT GERVASI,Sant Gervasi - Galvany,297
+2024,SARRIA-SANT GERVASI,Sant Gervasi - la Bonanova,72
+2024,SARRIA-SANT GERVASI,Sarrià,33
+2024,SARRIA-SANT GERVASI,"Vallvidrera, el Tibidabo i les Planes",3
+2024,SARRIA-SANT GERVASI,el Putxet i el Farró,202
+2024,SARRIA-SANT GERVASI,les Tres Torres,36
+2025,CIUTAT VELLA,"Sant Pere, Santa Caterina i la Ribera",237
+2025,CIUTAT VELLA,el Barri Gòtic,236
+2025,CIUTAT VELLA,el Raval,248
+2025,CIUTAT VELLA,la Barceloneta,118
+2025,GRACIA,Vallcarca i els Penitents,39
+2025,GRACIA,el Camp d'en Grassot i Gràcia Nova,228
+2025,GRACIA,el Coll,20
+2025,GRACIA,la Salut,37
+2025,GRACIA,la Vila de Gràcia,803
+2025,HORTA-GUINARDÓ,Can Baró,25
+2025,HORTA-GUINARDÓ,Horta,6
+2025,HORTA-GUINARDÓ,Sant Genís dels Agudells,3
+2025,HORTA-GUINARDÓ,el Baix Guinardó,102
+2025,HORTA-GUINARDÓ,el Carmel,35
+2025,HORTA-GUINARDÓ,el Guinardó,72
+2025,HORTA-GUINARDÓ,la Font d'en Fargues,4
+2025,HORTA-GUINARDÓ,la Teixonera,5
+2025,HORTA-GUINARDÓ,la Vall d'Hebron,1
+2025,L'EIXAMPLE,Sant Antoni,667
+2025,L'EIXAMPLE,el Fort Pienc,380
+2025,L'EIXAMPLE,l'Antiga Esquerra de l'Eixample,725
+2025,L'EIXAMPLE,la Dreta de l'Eixample,1802
+2025,L'EIXAMPLE,la Nova Esquerra de l'Eixample,511
+2025,L'EIXAMPLE,la Sagrada Família,822
+2025,LES CORTS,Pedralbes,11
+2025,LES CORTS,la Maternitat i Sant Ramon,47
+2025,LES CORTS,les Corts,208
+2025,NOU BARRIS,Canyelles,2
+2025,NOU BARRIS,Porta,12
+2025,NOU BARRIS,Verdun,3
+2025,NOU BARRIS,Vilapicina i la Torre Llobeta,17
+2025,NOU BARRIS,el Turó de la Peira,1
+2025,NOU BARRIS,la Guineueta,1
+2025,NOU BARRIS,la Prosperitat,3
+2025,NOU BARRIS,les Roquetes,2
+2025,SANT ANDREU,Navas,25
+2025,SANT ANDREU,Sant Andreu,32
+2025,SANT ANDREU,el Bon Pastor,2
+2025,SANT ANDREU,el Congrés i els Indians,6
+2025,SANT ANDREU,la Sagrera,23
+2025,SANT ANDREU,la Trinitat Vella,5
+2025,SANT MARTI,Diagonal Mar i el Front Marítim del Poblenou,129
+2025,SANT MARTI,Provençals del Poblenou,36
+2025,SANT MARTI,Sant Martí de Provençals,14
+2025,SANT MARTI,el Besòs i el Maresme,32
+2025,SANT MARTI,el Camp de l'Arpa del Clot,295
+2025,SANT MARTI,el Clot,52
+2025,SANT MARTI,el Parc i la Llacuna del Poblenou,103
+2025,SANT MARTI,el Poblenou,457
+2025,SANT MARTI,la Verneda i la Pau,9
+2025,SANT MARTI,la Vila Olímpica del Poblenou,106
+2025,SANTS-MONTJUÏC,Hostafrancs,176
+2025,SANTS-MONTJUÏC,Sants,247
+2025,SANTS-MONTJUÏC,Sants - Badal,110
+2025,SANTS-MONTJUÏC,el Poble-sec,571
+2025,SANTS-MONTJUÏC,la Bordeta,42
+2025,SANTS-MONTJUÏC,la Font de la Guatlla,141
+2025,SANTS-MONTJUÏC,la Marina de Port,8
+2025,SANTS-MONTJUÏC,la Marina del Prat Vermell,3
+2025,SARRIA-SANT GERVASI,Sant Gervasi - Galvany,310
+2025,SARRIA-SANT GERVASI,Sant Gervasi - la Bonanova,75
+2025,SARRIA-SANT GERVASI,Sarrià,33
+2025,SARRIA-SANT GERVASI,"Vallvidrera, el Tibidabo i les Planes",3
+2025,SARRIA-SANT GERVASI,el Putxet i el Farró,202
+2025,SARRIA-SANT GERVASI,les Tres Torres,36

@@ -1,0 +1,9 @@
+renv/
+*.RData
+*.html
+*.zip
+*.pdf
+.Rhistory
+.Rproj.user/
+tfm.nb.html
+dades/raw/

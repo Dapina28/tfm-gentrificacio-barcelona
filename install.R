@@ -1,0 +1,9 @@
+install.packages(c(
+  "shiny",
+  "plotly",
+  "dplyr",
+  "ggplot2",
+  "tidyr",
+  "scales",
+  "jsonlite"
+))
