@@ -7,17 +7,6 @@ Autor: David Piñol Navas
 
 ---
 
-## Estructura del repositori
-
-```
-repositori/
-├── shiny/
-│   └── App.R          # Aplicació Shiny interactiva
-├── dades/
-│   └── net/           # Dades processades (CSV i RDS)
-├── install.R          # Instal·lació de dependències
-└── README.md
-```
 
 ## Aplicació Shiny
 
