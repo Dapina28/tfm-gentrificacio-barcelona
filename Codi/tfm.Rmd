@@ -1,0 +1,2165 @@
+---
+title: "R Notebook"
+output:
+  pdf_document: default
+  
+
+always_allow_html: true
+---
+
+#Llibreries
+```{r}
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(lubridate)
+library(tidyverse)
+library(ggrepel)
+library(cluster)
+library(factoextra)
+library(ggcorrplot)
+library(shiny)
+library(leaflet)
+library(sf)
+
+```
+
+```{r}
+dir.create("../repositori/dades/raw", recursive = TRUE, showWarnings = FALSE)
+dir.create("../repositori/dades/net", recursive = TRUE, showWarnings = FALSE)
+```
+
+# Taula GeoJSON
+```{r}
+barris_geo <- st_read("../Dades/geoJSON/barris_barcelona.geojson", quiet = TRUE)
+
+```
+
+
+# Taula Renda
+```{r}
+fitxers_renda <- list.files(
+  path    = "../Dades/renda_per_persona",
+  full.names = TRUE
+)
+
+#Unim les taules
+df_renda <- fitxers_renda |>
+  map(read_csv, show_col_types = FALSE, na = c("..")) |>
+  list_rbind()
+
+write_csv(df_renda, "../repositori/dades/raw/renda.csv")
+```
+
+```{r}
+colSums(is.na(df_renda))
+```
+
+
+```{r}
+df_renda_barri <- df_renda |>
+  group_by(Any, Codi_Districte, Nom_Districte, Codi_Barri, Nom_Barri) |>
+  summarise(
+    renda_mitjana = mean(Import_Euros, na.rm = TRUE),
+    renda_mediana = median(Import_Euros, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+summary(df_renda_barri)
+```
+```{r}
+df_renda_barri <- df_renda_barri |>
+  mutate(Nom_Barri = case_when(
+    Nom_Barri == "el Poble Sec"              ~ "el Poble-sec",
+    Nom_Barri == "Sants-Badal"               ~ "Sants - Badal",
+    Nom_Barri == "Sant Gervasi- la Bonanova" ~ "Sant Gervasi - la Bonanova",
+    Nom_Barri == "Sant Gervasi- Galvany"     ~ "Sant Gervasi - Galvany",
+    .default = Nom_Barri
+  ))
+```
+
+# Taula Sexe-Edat
+```{r}
+#població per sexe i edat
+df_sexe_edat <- list.files(
+  path       = "../Dades/sexe_edat",
+  full.names = TRUE
+) |>
+  map(read.csv) |>
+  list_rbind()
+
+write_csv(df_sexe_edat, "../repositori/dades/raw/sexe_edat.csv")
+```
+
+```{r}
+colSums(is.na(df_sexe_edat))
+```
+
+## Neteja i transfrmació de dades
+
+Mirem quants valors nuls hi ha i veiem que per cada any, trobem un valor molt semblant en cada un.
+
+```{r}
+df_sexe_edat |>
+  filter(is.na(as.numeric(Valor))) |>
+  group_by(Data_Referencia) |>
+  summarise(n_nas = n()) |>
+  print()
+```
+
+Si ens fixem en quines edats corresponen els NAs, veiem que corresponen a les edats més elevades. És a dir, que no hi ha cap persona amb aquella edat, en aquell barri i en aquell any. Conluïm que podem convertir els NAs a 0.
+```{r}
+df_sexe_edat |>
+  filter(is.na(as.numeric(Valor))) |>
+  select(EDAT_1, Valor) |>
+  head(20)
+```
+
+```{r}
+df_sexe_edat <- df_sexe_edat |>
+  mutate(
+    Any = year(as.Date(Data_Referencia)),
+    Valor = as.numeric(Valor),
+    Valor = replace_na(Valor, 0)
+  )
+```
+
+
+## EDA
+
+Agrupem per any i barri i separem les edats en quatre franges diferents (menors, joves_adults, adults i jubilats).
+
+No hem inclòs el rang d'edat 18-25 ja que ens dona informació mixte entre estudiants i treballadors
+```{r}
+df_padro <- df_sexe_edat |>
+  group_by(Any, Codi_Districte, Nom_Districte, Codi_Barri, Nom_Barri) |>
+  summarise(
+    poblacio_total = sum(Valor, na.rm = TRUE),
+    edat_mitjana = weighted.mean(EDAT_1, Valor, na.rm = TRUE),
+    pct_menors = sum(Valor[EDAT_1 >= 0 & EDAT_1 <= 17], na.rm = TRUE) / sum(Valor, na.rm = TRUE),
+    pct_joves_adults = sum(Valor[EDAT_1 >= 25  & EDAT_1 <= 39], na.rm = TRUE) / sum(Valor, na.rm = TRUE),
+    pct_adults = sum(Valor[EDAT_1 >= 40 & EDAT_1 <= 64], na.rm = TRUE) / sum(Valor, na.rm = TRUE),
+    pct_jubilats= sum(Valor[EDAT_1 >= 65], na.rm = TRUE) / sum(Valor, na.rm = TRUE),
+    .groups = "drop"
+  )
+```
+
+```{r}
+# Edat mitjana per districte
+df_padro |>
+  filter(Any == max(Any)) |>
+  group_by(Nom_Districte) |>
+  summarise(edat_mitjana = mean(edat_mitjana)) |>
+  arrange(desc(edat_mitjana))
+```
+
+### Evolució grups d'edats
+```{r}
+# Evolució temporal: edat mitjana global
+df_padro |>
+  group_by(Any) |>
+  summarise(
+    `Menors (0-17)`        = mean(pct_menors,        na.rm = TRUE),
+    `Joves adults (25-39)` = mean(pct_joves_adults,  na.rm = TRUE),
+    `Adults (40-64)`= mean(pct_adults, na.rm = TRUE),
+    `Jubilats (+65)`          = mean(pct_jubilats,         na.rm = TRUE)
+  ) |>
+  pivot_longer(cols = -Any, names_to = "grup", values_to = "pct") |>
+  ggplot(aes(x = Any, y = pct, color = grup)) +
+  geom_line(linewidth = 1) + geom_point() +
+  scale_y_continuous(labels = scales::percent) +
+  labs(title = "Evolució de la distribució per grups d'edat a Barcelona",
+       x = "Any", y = "% de la població", color = NULL)
+```
+
+
+### Edats per barri
+```{r fig.width=10}
+df_padro |>
+  filter(Any == max(Any)) |>
+  select(Nom_Barri, pct_menors, pct_joves_adults, pct_adults, pct_jubilats) |>
+  pivot_longer(cols = starts_with("pct_"), names_to = "grup", values_to = "pct") |>
+  mutate(grup = case_when(
+    grup == "pct_menors"       ~ "Menors (0-17)",
+    grup == "pct_joves_adults" ~ "Joves adults (25-39)",
+    grup == "pct_adults"       ~ "Adults (40-64)",
+    grup == "pct_jubilats"     ~ "Jubilats (65+)"
+  )) |>
+  group_by(grup) |>
+  slice_max(pct, n = 10) |>
+  ungroup() |>
+  mutate(etiqueta = reorder(paste(grup, Nom_Barri, sep = "___"), pct)) |>
+  ggplot(aes(x = pct, y = etiqueta, fill = grup)) +
+  geom_col(show.legend = FALSE) +
+  scale_x_continuous(labels = scales::percent) +
+  scale_y_discrete(labels = \(x) sub(".*___", "", x)) +
+  facet_wrap(~ grup, scales = "free_y") +
+  labs(title = "Top 10 barris per grup d'edat",
+       x = "% de la població", y = NULL)
+```
+En aquest gràfic hem representat en quatre gràfic de barres (un per cada rang d'edat), aquells barris amb major quantitat de població dins de cada grup. Podem concloure el següent:
+
+- La Marina del Prat Vermell és el barri més jove però molt a prop de la resta de barris
+- El barri gòtic és el barri amb més adults-joves
+- La Clota és tècnicament el barri amb més adults, però degut a que és un barri molt petit, no creiem que sigui un resultat significatiu. El següent barri amb més adults és Diagonal Mar.
+- El barri més envellit és Canyelles, però ens trobem el mateix cas que abans, així que el següent barri que trobem és La Vall d'Hebron.
+
+
+Si veiem l'evolució de l'increment del preu del lloguer, veiem que no hi ha cap zona que destaqui per sobre de la resta. Sembla que el que fa pujar el preu és algo que afecta a tots els barris.
+
+```{r}
+df_padro_renda <- df_renda_barri |>
+    select(-Nom_Districte, -Nom_Barri) |>
+    inner_join(
+      df_padro,
+      by = c("Any", "Codi_Districte", "Codi_Barri")
+    )
+```
+
+### Districtes amb les rendes més altes
+```{r}
+df_padro_renda |>
+  filter(Any == max(Any)) |>
+  group_by(Nom_Districte) |>
+  summarise(renda_mitjana = mean(renda_mitjana, na.rm = TRUE)) |>
+  arrange(desc(renda_mitjana)) |>
+  ggplot(aes(x = reorder(Nom_Districte, renda_mitjana), y = renda_mitjana)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Renda mitjana per districte", x = NULL, y = "Renda mitjana")
+```
+Veiem la desigualtat a nivell de renda en la ciutat. Sarrià-Sant Gervasi com els districtes més acomodat i Nou Barris el que menys.
+
+### Evolució de la renda per barri
+```{r}
+df_padro_renda |>
+  group_by(Any, Nom_Districte) |>
+  summarise(renda_mitjana = mean(renda_mitjana, na.rm = TRUE), .groups = "drop") |>
+  ggplot(aes(x = Any, y = renda_mitjana, color = Nom_Districte)) +
+  geom_line() + geom_point() +
+  geom_text_repel(
+    data        = ~ filter(.x, Any == max(Any)),
+    aes(label   = Nom_Districte),
+    hjust       = -0.1,
+    size        = 3,
+    direction   = "y",
+    nudge_x     = 0.3,
+    segment.color = "grey70"
+  ) +
+  scale_x_continuous(limits = c(NA, max(df_padro_renda$Any) + 1)) +
+  labs(title = "Evolució de la renda per districte",
+       x = "Any", y = "Renda mitjana (€)") +
+  theme(legend.position = "none")
+```
+La tendència en tots els districtes ha estat positiva i amb un creixement molt semblant. Com ja em vist en el gràfic anterior, Sarrià-Sant Gervasi i Les Corts destaquen per tenir estar molt separats de la resta.
+
+```{r}
+  df_renda_barri |>
+    group_by(Any, Nom_Districte) |>
+    summarise(renda_mitjana = mean(renda_mitjana, na.rm = TRUE), .groups = "drop") |>
+    arrange(Nom_Districte, Any) |>
+    group_by(Nom_Districte) |>
+    mutate(creixement_pct = (renda_mitjana / lag(renda_mitjana) - 1) * 100) |>
+    ungroup() |>
+    filter(!is.na(creixement_pct)) |>
+    ggplot(aes(x = Any, y = creixement_pct, color = Nom_Districte)) +
+    geom_line(linewidth = 0.9) +
+    geom_point(size = 1.8) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+    geom_text_repel(
+      data          = ~ filter(.x, Any == max(Any)),
+      aes(label     = Nom_Districte),
+      hjust         = 0,
+      size          = 3,
+      direction     = "y",
+      nudge_x       = 0.2,
+      segment.color = "grey70",
+      segment.size  = 0.3
+    ) +
+    scale_x_continuous(
+      breaks = seq(2016, 2023, by = 1),
+      limits = c(NA, 2025)
+    ) +
+    scale_y_continuous(labels = scales::label_percent(scale = 1, suffix = "%")) +
+    scale_color_brewer(palette = "Paired") +
+    labs(
+      title   = "Velocitat de creixement de la renda per càpita per districte",
+      caption = "Font: Departament d'Estadística de l'Ajuntament de Barcelona",
+      x       = NULL,
+      y       = "Creixement interanual (%)"
+    ) +
+    theme_minimal(base_size = 11) +
+    theme(
+      legend.position  = "none",
+      panel.grid.minor = element_blank(),
+      plot.title       = element_text(face = "bold")
+    )
+```
+
+
+# Taula lloc naixement
+
+```{r}
+df_lloc_naix <- list.files(
+  path       = "../Dades/lloc_naix_regio",
+  full.names = TRUE
+) |>
+  map(read_csv, show_col_types = FALSE, na = c("", "..")) |>
+  list_rbind()
+
+write_csv(df_lloc_naix, "../repositori/dades/raw/lloc_naix_regio.csv")
+```
+
+```{r}
+colSums(is.na(df_lloc_naix))
+
+```
+Les dades nules es troben només al dia 1 de cada any com a valor de referència. Podem convertir a 0.
+```{r}
+df_lloc_naix |>
+  filter(is.na(Valor)) |>
+  count(Nom_Barri, Data_Referencia) |>
+  arrange(desc(n))
+```
+
+```{r}
+df_lloc_naix <- df_lloc_naix |>
+  mutate(
+    Any   = year(as.Date(Data_Referencia)),
+    Valor = as.numeric(Valor),
+    Valor = replace_na(Valor, 0)
+  ) |>
+  select (-Data_Referencia)
+
+df_lloc_naix <- df_lloc_naix |>
+  group_by(Any, Codi_Districte, Nom_Districte, Codi_Barri, Nom_Barri, LLOC_NAIX_REGIO) |>
+  summarise(poblacio = sum(Valor, na.rm = TRUE), .groups = "drop") |>
+  group_by(Any, Codi_Districte, Nom_Districte, Codi_Barri, Nom_Barri) |>
+  mutate(total_barri = sum(poblacio), pct = poblacio / total_barri) |>
+  ungroup()
+
+```
+
+### Evolució de la població segons origen
+
+```{r}
+  df_lloc_naix |>
+    filter(LLOC_NAIX_REGIO != 23) |>
+    mutate(
+      gran_regio = case_when(
+        LLOC_NAIX_REGIO %in% 1:5   ~ "Àfrica",
+        LLOC_NAIX_REGIO %in% 6:8   ~ "Amèrica Llatina",
+        LLOC_NAIX_REGIO == 9        ~ "Amèrica del Nord",
+        LLOC_NAIX_REGIO %in% 10:14 ~ "Àsia",
+        LLOC_NAIX_REGIO %in% 15:18 ~ "Europa",
+        LLOC_NAIX_REGIO %in% 19:22 ~ "Oceania"
+      )
+    ) |>
+    group_by(Any, gran_regio) |>
+    summarise(poblacio = sum(poblacio, na.rm = TRUE), .groups = "drop") |>
+    ggplot(aes(x = Any, y = poblacio, color = gran_regio)) +
+    geom_line() + geom_point() +
+    scale_y_continuous(labels = scales::comma) +
+    scale_color_manual(values = c(
+      "Àfrica"           = "darkred",
+      "Amèrica Llatina"  = "orange",
+      "Amèrica del Nord" = "gold",
+      "Àsia"             = "purple",
+      "Europa"           = "steelblue",
+      "Oceania"          = "grey60"
+    )) +
+    labs(title = "Evolució de la població per regió d'origen a Barcelona",
+         x = "Any", y = "Nombre de persones", color = "Regió d'origen")
+```
+#Taula de dimensions
+
+```{r}
+noms_regio <- read_csv2("../Dades/pad_dimensions.csv", show_col_types = FALSE) |>
+  filter(Codi_Dimensio == 6) |>
+  select(Codi_Valor, nom_regio = Desc_Valor_CA)
+```
+
+### Regio d'origen d'estrangers per barri
+```{r fig.height=10, fig.width=10}
+  df_top3_barri <- df_lloc_naix |>
+    filter(Any == max(Any), LLOC_NAIX_REGIO != 23) |>
+    group_by(Nom_Districte, Nom_Barri, LLOC_NAIX_REGIO) |>
+    summarise(poblacio = sum(poblacio), .groups = "drop") |>
+    group_by(Nom_Districte, Nom_Barri) |>
+    mutate(pct = poblacio / sum(poblacio)) |>
+    slice_max(pct, n = 3) |>
+    ungroup() |>
+    left_join(noms_regio, by = c("LLOC_NAIX_REGIO" = "Codi_Valor"))
+
+  ordre <- df_top3_barri |>
+    group_by(Nom_Districte, Nom_Barri) |>
+    summarise(max_pct = max(pct), .groups = "drop") |>
+    arrange(Nom_Districte, max_pct) |>
+    mutate(clau = paste(Nom_Districte, Nom_Barri, sep = "___"))
+
+  df_top3_barri |>
+    mutate(
+      clau     = paste(Nom_Districte, Nom_Barri, sep = "___"),
+      etiqueta = factor(clau, levels = ordre$clau)
+    ) |>
+    ggplot(aes(x = pct, y = etiqueta, fill = nom_regio)) +
+    geom_col(position = "stack") +
+    scale_x_continuous(labels = scales::percent) +
+    scale_y_discrete(labels = \(x) sub(".*___", "", x)) +
+    facet_wrap(~ Nom_Districte, scales = "free_y", ncol = 2) +
+    labs(
+      title   = paste("Top 3 regions d'origen per barri (", max(df_lloc_naix$Any), ")"),
+      x       = "% sobre el total del barri",
+      y       = NULL,
+      fill    = NULL
+    ) +
+    theme_minimal() +
+    theme(
+      strip.text      = element_text(face = "bold"),
+      legend.position = "bottom"
+    )
+```
+El més destacable ho trobem en el districte de Ciutat Vella, en concret, en el Barri Gòtic i el Raval. És la zona en la qual trobem una major concentració de població de l'Àsia meridional, fet que junt amb la població d'Amèrica del Sud, sigui on trobem la menor quantitat de població d'Europa Meridional.
+
+
+#Regio alt poder adquisitiu
+
+```{r}
+df_regio_rica <- df_lloc_naix |>
+  filter(LLOC_NAIX_REGIO %in% c(9, 16, 18, 19)) |>  # Amèrica del Nord + Europa occidental
+  group_by(Any, Codi_Barri) |>
+  summarise(pob_regio_rica = sum(poblacio), .groups = "drop") |>
+  inner_join(
+    df_padro |> select(Any, Codi_Barri, Nom_Barri, poblacio_total),
+    by = c("Any", "Codi_Barri")
+  ) |>
+  mutate(pct_regio_rica = pob_regio_rica / poblacio_total)
+```
+
+Una de les dimensions que s'ha vist en l'estat de l'art que influeix en la gentrificació és l'arribada de estrangers de països d'alt nivell adquisitiu, com Amèrica de Nord i el Nord/Centre d'Europa.
+
+### Mapa
+
+```{r}
+ barris_geo |>
+    left_join(
+      df_regio_rica |> filter(Any == 2025),
+      by = c("nom_barri" = "Nom_Barri")
+    ) |>
+    ggplot() +
+    geom_sf(aes(fill = pct_regio_rica), color = "white", linewidth = 0.2) +
+    scale_fill_viridis_c(
+      option    = "magma",
+      direction = -1,
+      labels    = scales::percent_format(),
+      name      = "% residents",
+      na.value  = "grey80"
+    ) +
+    labs(title = "Residents d'Amèrica del Nord i Europa") +
+    theme_void()
+```
+Sembla que aquest perfil d'estranger té preferència per tres zones de Barcelona, la primera seria la zona que coincideix amb les rendes més altes (Sarrià-Sant Gervasi), seguit de la zona més céntrica (Eixamble i la vila de Gràcia) i finalment Cuitat Vella. És molt probable que el sector més jove d'aquest segment d'estrangers tingui preferència per aquest últim districte portats pel turisme. Malauradament les dades que tenim no ens deixen separar per edat i no ho podem comprovar. 
+
+# Taula lloc_naix_simple
+```{r}
+df_lloc_naix_simple <- list.files(
+  path       = "../Dades/lloc_naix",
+  full.names = TRUE
+) |>
+  map(read_csv, show_col_types = FALSE, na = c("", "..")) |>
+  list_rbind()
+
+write_csv(df_lloc_naix_simple, "../repositori/dades/raw/lloc_naix_simple.csv")
+
+df_lloc_naix_simple <- df_lloc_naix_simple |>
+  mutate(
+    Any   = year(as.Date(Data_Referencia)),
+    Valor = as.numeric(Valor),
+    Valor = replace_na(Valor, 0)
+  )|>
+  select(-Data_Referencia)
+  
+```
+
+```{r}
+colSums(is.na(df_sexe_edat))
+
+```
+
+
+## EDA
+
+### Desplaçament barcelonins per barri (absolut)
+```{r fig.height=14, fig.width=8}
+df_lloc_naix_simple |>
+  filter(Any %in% c(2015, 2025), LLOC_NAIX == 1) |>
+  group_by(Any, Codi_Barri, Nom_Barri) |>
+  summarise(barcelonins = sum(Valor, na.rm = TRUE), .groups = "drop") |>
+  pivot_wider(names_from = Any, values_from = barcelonins,
+              names_prefix = "barcelonins_") |>
+  mutate(diferencia = barcelonins_2025 - barcelonins_2015) |>
+  ggplot(aes(x = reorder(Nom_Barri, diferencia), y = diferencia,
+             fill = diferencia < 0)) +
+  geom_col() +
+  coord_flip() +
+  scale_y_continuous(labels = scales::comma) +
+  scale_fill_manual(values = c("TRUE" = "darkred", "FALSE" = "steelblue"),
+                    guide = "none") +
+  labs(title = "Desplaçament de barcelonins per barri (2015–2025)",
+       x = NULL, y = "Variació absoluta (persones)")
+```
+
+### Desplaçament barcelonins per barri (relatiu)
+```{r fig.height=14, fig.width=8}
+ df_lloc_naix_simple |>
+    filter(Any %in% c(2015, 2025)) |>
+    group_by(Any, Codi_Barri, Nom_Barri, LLOC_NAIX) |>
+    summarise(poblacio = sum(Valor, na.rm = TRUE), .groups = "drop") |>
+    group_by(Any, Codi_Barri, Nom_Barri) |>
+    mutate(pct = poblacio / sum(poblacio)) |>
+    filter(LLOC_NAIX == 1) |>
+    select(Any, Nom_Barri, pct) |>
+    pivot_wider(names_from = Any, values_from = pct, names_prefix = "pct_") |>
+    mutate(diferencia = (pct_2025 - pct_2015) / pct_2015) |>
+    ggplot(aes(x = reorder(Nom_Barri, diferencia), y = diferencia,
+               fill = diferencia < 0)) +
+    geom_col() +
+    coord_flip() +
+    scale_y_continuous(labels = scales::percent) +
+    scale_fill_manual(values = c("TRUE" = "darkred", "FALSE" = "steelblue"),
+                      guide = "none") +
+    labs(title = "Desplaçament de barcelonins per barri (2015–2025)",
+         x = NULL, y = "Variació relativa i % nascuts a Barcelona")
+```
+Quan analitzem el desplaçament de barcelonins en un procés de gentrificació, el primer instint és mirar simplement si hi ha menys barcelonins al barri el 2025 que el 2015. Però aquest indicador pot ser enganyós, un barri pot tenir menys barcelonins en proporció simplement perquè ha crescut molt i han arribat moltes persones de fora, no perquè els barcelonins hagin marxat. 
+De la mateixa manera, un barri pot haver perdut barcelonins en termes absoluts però si la població total també ha caigut, el % de barcelonins podria fins i tot haver pujat.
+
+Per això hem decidir combinar els dos angles en un sol gràfic. El canvi en nombres absoluts de barcelonins a l'eix horitzontal i el canvi relatiu del seu pes proporcional a l'eix vertical. Això ens permet separar els casos de desplaçament real dels de simple dilució demogràfica.
+
+Interpretació
+
+Els barris que apareixen a la zona inferior esquerra del gràfic, amb valors negatius en tots dos eixos, són els únics on podem parlar de desplaçament real, hi ha físicament menys barcelonins que fa deu anys i a més representen una proporció menor de la població. Aquests barris haurien de ser el focus principal de l'anàlisi de gentrificació.
+
+Els barris de la zona inferior dreta mostren una situació diferent, tot i que el percentatge de barcelonins ha baixat, el seu nombre absolut ha crescut o s'ha mantingut. Aquí el que ha passat és que han arribat moltes persones d'altres orígens, diluint el pes relatiu dels barcelonins sense que aquests hagin hagut de marxar. No és desplaçament sinó transformació demogràfica per creixement.
+
+Els barris de la zona superior dreta són els que han guanyat barcelonins tant en absolut com en proporció, podrien ser barris que han viscut un procés invers, atreient població nativa, o simplement barris estables sense grans canvis migratoris.
+
+### Combinació del desplaçament absolut i relatiu
+
+```{r fig.height=8, fig.width=10}
+df_lloc_naix_simple |>
+  filter(Any %in% c(2015, 2025), LLOC_NAIX == 1) |>
+  group_by(Any, Codi_Barri, Nom_Barri) |>
+  summarise(barcelonins = sum(Valor, na.rm = TRUE), .groups = "drop") |>
+  group_by(Any, Codi_Barri, Nom_Barri) |>
+  ungroup() |>
+  left_join(
+    df_lloc_naix_simple |>
+      filter(Any %in% c(2015, 2025)) |>
+      group_by(Any, Codi_Barri, Nom_Barri) |>
+      summarise(total = sum(Valor, na.rm = TRUE), .groups = "drop"),
+    by = c("Any", "Codi_Barri", "Nom_Barri")
+  ) |>
+  mutate(pct = barcelonins / total) |>
+  select(Any, Codi_Barri, Nom_Barri, barcelonins, pct) |>
+  pivot_wider(names_from = Any,
+              values_from = c(barcelonins, pct)) |>
+  mutate(
+    canvi_absolut  = barcelonins_2025 - barcelonins_2015,
+    canvi_relatiu  = (pct_2025 - pct_2015) / pct_2015
+  ) |>
+  ggplot(aes(x = canvi_absolut, y = canvi_relatiu, label = Nom_Barri)) +
+  geom_point(alpha = 0.7, color = "steelblue", size = 2) +
+  geom_text_repel(size = 2.5, max.overlaps = Inf) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
+  scale_y_continuous(labels = scales::percent) +
+  scale_x_continuous(labels = scales::comma) +
+  annotate("text", x = -Inf, y = -Inf, hjust = -0.1, vjust = -0.5,
+           label = "Desplaçament real", color = "darkred", size = 3) +
+  labs(title = "Desplaçament de barcelonins per barri (2015–2025)",
+       x = "Canvi absolut (persones)",
+       y = "Canvi relatiu (%)")
+```
+El Barri Gòtic és l'outlier més extrem en termes relatius (-50%). Ha perdut la meitat dels seus barcelonins en 10 anys. És el cas de desplaçament més intens de tota la ciutat, tot i que en termes absoluts no és el més gran per ser un barri petit.
+
+Les Eixamples, la Sagrada Família, la Vila de Gràcia i el Poble sec son els barris que tenen el desplaçament absolut més gran (-3.500 a -4.000 persones) i també relatiu elevat (-18-20%). Són els barris que més barcelonins han perdut en termes totals.
+
+La Marina del Prat Vermell — cas curiós: -33% relatiu però poc absolut. Barri molt petit que s'està buidant ràpidament. Probablement procés de transformació urbanística.
+
+```{r}
+df_origen_simple_barri <- df_lloc_naix_simple |>
+  group_by(Any, Codi_Districte, Nom_Districte, Codi_Barri, Nom_Barri, LLOC_NAIX) |>
+  summarise(poblacio = sum(Valor, na.rm = TRUE), .groups = "drop") |>
+  group_by(Any, Codi_Districte, Nom_Districte, Codi_Barri, Nom_Barri) |>
+  mutate(total_barri = sum(poblacio), pct = poblacio / total_barri) |>
+  ungroup() |>
+  group_by(Any, Codi_Districte, Nom_Districte, Codi_Barri, Nom_Barri) |>
+  summarise(
+    pct_barcelona    = sum(pct[LLOC_NAIX == 1], na.rm = TRUE),
+    pct_cat          = sum(pct[LLOC_NAIX == 2], na.rm = TRUE),
+    pct_espanya      = sum(pct[LLOC_NAIX == 3], na.rm = TRUE),
+    pct_ue           = sum(pct[LLOC_NAIX == 4], na.rm = TRUE),
+    pct_fora_ue      = sum(pct[LLOC_NAIX == 5], na.rm = TRUE),
+    .groups = "drop"
+  )
+```
+
+
+Aquí estem comparant les tendències entre el preu del lloguer en el 5 barris amb major % d'aquesta població i es destaquen dues coses.
+
+- Sembla que és primer el preu del lloguer el que incrementa i després arriben aquest perfil d'estrangers.
+- el Barri Gòtic és un casi particular, mentre els preus segueixen pujant, els estrangers baixen fins un 20%. Això fa pensar que potser hi ha una altra variable que compensa aqueta baixada que fa que els preus segueixin pujant.
+
+# Taula Flux Migratori
+
+Hi ha valors de '..', això pot equivaldre a valors entre 1-4 però per motius de privacitat quan hi ha pocs moviments, aquestes dades queden ocultes. Decidim Dubstituïr per 0 tenint això en compte.
+
+```{r}
+df_flux <- list.files(
+  path       = "../Dades/flux_migratori",
+  full.names = TRUE
+) |>
+  map(read_csv, show_col_types = FALSE, na = c("..")) |>
+  list_rbind() |>
+  mutate(Valor = replace_na(Valor, 0))
+
+write_csv(df_flux, "../repositori/dades/raw/flux_migratori.csv")
+```
+
+```{r}
+#Afagim el nom del barri en una nova columna
+codis_barri <- df_flux |> distinct(Codi_Barri, Nom_Barri)
+
+df_flux <- df_flux |>
+  left_join(codis_barri, by = c("CODI_BARRI_DEST" = "Codi_Barri")) |>
+  rename(
+    Nom_Barri_Origen = Nom_Barri.x,
+    Nom_Barri_Dest   = Nom_Barri.y
+  )
+```
+
+
+
+```{r}
+colSums(is.na(df_flux))
+```
+```{r}
+#Descartem el desplaçament dins d'un mateix barri
+df_flux <- df_flux |>
+  filter(Codi_Barri != CODI_BARRI_DEST, Any >= 2015)
+```
+
+
+El barri destí que més cops s'ha repetit és la Marina del Prat Vermell. Això coincideix amb el fet que com hem vist abans, també és l'únic barri que no només no ha perdut nombre de barcelonins, sinò que n'ha augmentat. Com és barri amb encara molt espai per construir, molta gent s'està desplaçant cap allà
+
+# Taula preus compra
+```{r}
+df_preus <- read_csv2("../Dades/preus_vivendes_compra/Preus_compra.csv",
+                     show_col_types = FALSE)
+str(df_preus)
+```
+
+## Neteja i transformació de dades
+```{r}
+  df_preus <- df_preus|>
+  select(-`2026`, -`...19`) |>
+  filter(`Tipus de territori` == "Barri",
+         `Tipus de propietat` == "Horitzontal") |>
+  pivot_longer(cols = `2012`:`2025`,
+               names_to  = "Any",
+               values_to = "preu_m2") |>
+  mutate(
+    Any     = as.integer(Any),
+    preu_m2 = as.numeric(na_if(preu_m2, "-"))
+  ) |>
+  rename(Nom_Barri = Territori) |>
+  select(Nom_Barri, Any, preu_m2)
+
+```
+
+```{r}
+colSums(is.na(df_preus))
+
+```
+
+
+```{r}
+#Hi ha un valor atípic en l'any 2015 en Ciutat Meridiana, axí que fem interpolació lineal per resoldre aquest problema
+df_preus <- df_preus |>
+  mutate(preu_m2 = if_else(
+    Nom_Barri == "Ciutat Meridiana" & Any == 2015,
+    approx(c(2014, 2016), c(689.57, 930.03), xout = 2015)$y,
+    preu_m2
+  ))
+```
+
+## EDA
+
+### Barris més cars de compra
+
+```{r}
+df_preus |>
+  filter(Any == 2025) |>
+  slice_max(preu_m2, n = 15) |>
+  ggplot(aes(x = preu_m2, y = reorder(Nom_Barri, preu_m2))) +
+  geom_col(fill = "steelblue") +
+  scale_x_continuous(labels = scales::comma) +
+  labs(title = "Barris amb el preu de compra més car (2025)",
+       x = "€/m²", y = NULL)
+```
+
+### Barris amb major creixement del preu de compra
+```{r}
+top10_barris <- df_preus |>
+  filter(Any %in% c(2012, 2025)) |>
+  pivot_wider(names_from = Any, values_from = preu_m2,
+              names_prefix = "preu_") |>
+  mutate(creixement = (preu_2025 - preu_2012) / preu_2012) |>
+  slice_max(creixement, n = 10) |>
+  pull(Nom_Barri)
+
+df_preus |>
+  filter(Nom_Barri %in% top10_barris) |>
+  ggplot(aes(x = Any, y = preu_m2, color = Nom_Barri)) +
+  geom_line() + geom_point() +
+  geom_text(data = ~ filter(.x, Any == 2025),
+            aes(label = Nom_Barri), hjust = -0.1, size = 3) +
+  scale_x_continuous(limits = c(2012, 2028)) +
+  scale_y_continuous(labels = scales::comma) +
+  theme(legend.position = "none") +
+  labs(title = "Top 10 barris amb major creixement de preu (2012–2025)",
+       x = "Any", y = "€/m²")
+```
+# Taula preus lloguers
+```{r}
+df_lloguers <- read_csv2("../Dades/preu_vivendes_lloguer/preus_lloguer.csv",na = c("nd"), locale =locale(encoding = "UTF-8"))
+
+write_csv(df_lloguers, "../repositori/dades/raw/preus_lloguer_wide.csv")
+```
+
+```{r}
+df_lloguers <- df_lloguers|>
+pivot_longer(cols = `2014`:`2025`,
+             names_to  = "Any",
+             values_to = "preu_m2") |>
+mutate(
+  Any     = as.integer(Any),
+  preu_m2 = as.numeric(preu_m2)
+) |>
+rename(Nom_Barri = Barris) |>
+select(Nom_Barri, Any, preu_m2)
+```
+
+
+## Neteja 
+
+```{r}
+df_lloguers <- df_lloguers |>
+  mutate(Nom_Barri = case_when(
+    Nom_Barri == "el Poble Sec" ~ "el Poble-sec",
+    Nom_Barri == "Sants-Badal"  ~ "Sants - Badal",
+    Nom_Barri == "Sant Gervasi- la Bonanova" ~ "Sant Gervasi - la Bonanova",
+    Nom_Barri == "Sant Gervasi- Galvany" ~ "Sant Gervasi - Galvany",
+    .default = Nom_Barri
+  ))
+```
+
+```{r}
+colSums(is.na(df_lloguers))
+```
+
+```{r}
+df_lloguers |>
+  filter(is.na(preu_m2)) |>
+  count(Nom_Barri, Any) |>
+  print(n = Inf)
+```
+Veiem que els nas estan en barris perifèrics. Decidim substituir-los per interpolació lineal.
+
+```{r}
+df_lloguers <- df_lloguers |>
+  group_by(Nom_Barri) |>
+  arrange(Any) |>
+  mutate(preu_m2 = approx(Any, preu_m2, xout = Any, rule = 2)$y) |>
+  ungroup()
+  
+```
+
+
+### Barris més cars de lloguer
+
+```{r}
+ barris_geo |>
+    left_join(
+      df_lloguers |> filter(Any == max(Any)),
+      by = c("nom_barri" = "Nom_Barri")
+    ) |>
+    ggplot() +
+    geom_sf(aes(fill = preu_m2), color = "white", linewidth = 0.2) +
+    scale_fill_viridis_c(
+      option   = "magma",
+      direction = -1,
+      labels   = scales::comma,
+      name     = "€/m²",
+      na.value = "grey80"
+    ) +
+    labs(title = "Preu del lloguer per barri") +
+    theme_void()
+```
+Curiosament, els barris amb el lloguer més alts son més alts que els barris més cars de compra, per sobre del que hauria pel seu nivell de renda. Aquí podem veure que la demanda d'aquests pisos és significativament superior a la resta. 
+
+### Baris amb major creixement del preu de lloguer
+```{r}
+  df_lloguers |>
+    filter(Any %in% c(2014, 2025)) |>
+    pivot_wider(names_from = Any, values_from = preu_m2, names_prefix = "preu_") |>
+    mutate(creixement_abs = preu_2025 - preu_2014) |>
+    slice_max(creixement_abs, n = 20) |>
+    ggplot(aes(x = creixement_abs, y = reorder(Nom_Barri, creixement_abs))) +
+    geom_col(fill = "steelblue") +
+    labs(
+      title = "Barris amb major creixement absolut del preu de lloguer (2014–2025)",
+      x = "Increment (€/m²)",
+      y = NULL
+    ) +
+    theme_minimal()
+
+```
+El més significatiu és que, a part de Diagonal Mar, la resta de barris que més s'han encarit són els barris perifèrics i obrers.
+
+```{r}
+  barris_geo |>
+    left_join(
+      df_lloguers |>
+        filter(Any %in% c(2014, 2025)) |>
+        pivot_wider(names_from = Any, values_from = preu_m2, names_prefix = "preu_") |>
+        mutate(creixement_abs = preu_2025 - preu_2014),
+      by = c("nom_barri" = "Nom_Barri")
+    ) |>
+    ggplot() +
+    geom_sf(aes(fill = creixement_abs), color = "white", linewidth = 0.2) +
+    scale_fill_viridis_c(
+      option    = "magma",
+      direction = -1,
+      labels    = scales::label_number(suffix = " €/m²"),
+      name      = "Increment\nabsolut",
+      na.value  = "grey80"
+    ) +
+    labs(
+      title   = "Creixement absolut del preu de lloguer per barri (2014–2025)",
+      caption = "La Marina del Prat Vermell s'exclou per valors atípics"
+    ) +
+    theme_void()
+```
+Amb aquest mapa confirmem que la perifèria és la més afectada per l'increment dels preus del lloguer i es destaca el cas de la Marina del Prat Vermell.
+
+### Evolució preu compra vs preu lloguer
+```{r}
+  idx_lloguers <- df_lloguers |>
+    group_by(Nom_Barri) |>
+    mutate(idx = preu_m2 / preu_m2[Any == 2014] - 1) |>
+    ungroup() |>
+    group_by(Any) |>
+    summarise(idx_mitja = mean(idx, na.rm = TRUE)) |>
+    mutate(tipus = "Lloguer")
+
+  idx_compres <- df_preus |>
+    filter(Any >= 2014) |>
+    group_by(Nom_Barri) |>
+    mutate(idx = preu_m2 / preu_m2[Any == 2014] - 1) |>
+    ungroup() |>
+    group_by(Any) |>
+    summarise(idx_mitja = mean(idx, na.rm = TRUE)) |>
+    mutate(tipus = "Compra")
+
+  bind_rows(idx_lloguers, idx_compres) |>
+    ggplot(aes(x = Any, y = idx_mitja, color = tipus)) +
+    geom_line(linewidth = 1) + geom_point() +
+    labs(title = "Evolució del preu de lloguer vs compra respecte 2014",
+         x = "Any", y = "Creixement acumulat", color =
+  NULL) +
+    scale_y_continuous(labels = scales::percent_format()) +
+    theme(legend.position = "top")
+```
+És destacable com el preu de compra ha pujat molt més que el preu de lloguer, convertint el lloguer en l'única opció viable per poder viure.
+
+### Estrangers benestants vs preus
+```{r}
+cor_cont <- df_regio_rica |>
+  inner_join(df_lloguers, by = c("Any", "Nom_Barri")) |>
+  summarise(cor = cor(pct_regio_rica, preu_m2, use = "complete.obs")) |>
+  mutate(tipus = "Contemporània: estrangers(t) vs preu(t)")
+
+cor_h1 <- df_regio_rica |>
+  inner_join(
+    df_lloguers |> mutate(Any = Any - 1),
+    by = c("Any", "Nom_Barri")
+  ) |>
+  summarise(cor = cor(pct_regio_rica, preu_m2, use = "complete.obs")) |>
+  mutate(tipus = "H1: estrangers(t) → preu(t+1)")
+
+cor_h2 <- df_lloguers |>
+  inner_join(
+    df_regio_rica |> mutate(Any = Any - 1),
+    by = c("Any", "Nom_Barri")
+  ) |>
+  summarise(cor = cor(preu_m2, pct_regio_rica, use = "complete.obs")) |>
+  mutate(tipus = "H2: preu(t) → estrangers(t+1)")
+
+bind_rows(cor_cont, cor_h1, cor_h2)
+
+
+
+top5_regio <- df_regio_rica |>
+  filter(Any == max(Any)) |>
+  slice_max(pct_regio_rica, n = 5) |>
+  pull(Nom_Barri)
+
+df_regio_rica |>
+  filter(Nom_Barri %in% top5_regio) |>
+  inner_join(df_lloguers, by = c("Any", "Nom_Barri")) |>
+  group_by(Nom_Barri) |>
+  mutate(
+    idx_regio   = pct_regio_rica / pct_regio_rica[Any == min(Any)] * 100,
+    idx_lloguer = preu_m2 / preu_m2[Any == min(Any)] * 100
+  ) |>
+  ungroup() |>
+  pivot_longer(cols = c(idx_regio, idx_lloguer),
+               names_to = "indicador", values_to = "index") |>
+  mutate(indicador = case_when(
+    indicador == "idx_regio"   ~ "% estrangers regions riques",
+    indicador == "idx_lloguer" ~ "Preu lloguer"
+  )) |>
+  ggplot(aes(x = Any, y = index, color = indicador)) +
+  geom_line(linewidth = 1) + geom_point() +
+  facet_wrap(~ Nom_Barri, ncol = 2) +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  labs(title = "Evolució d'estrangers de regions riques i preu de lloguer",
+       x = "Any", y = "Increment", color = NULL) +
+  theme(legend.position = "top")  
+```
+
+# Taula pisos turístics
+
+Algunes anys no tenen el codi del barri ni del districte, així que haurem de treballar amb el nom i solucionar els problemes que tinguem amb la coincidència dels noms amb altres taules.
+```{r}
+# Taula pisos turístics (HUT)
+fitxers_hut <- c(
+  "2018_4T_hut_comunicacio.csv.zip",
+  "2019_4T_hut_comunicacio.csv.zip",
+  "2020_4T_hut_comunicacio.csv.zip",
+  "2021_4T_hut_comunicacio.csv.zip",
+  "2022_4T_hut_comunicacio.csv.zip",
+  "2023_4T_hut_comunicacio_opendata.csv.zip",
+  "2024_4T_hut_comunicacio_opendata.csv.zip",
+  "2025_4T_hut_comunicacio_opendata.csv.zip"
+)
+
+  llegir_hut <- function(nom_fitxer) {
+    any  <- as.integer(str_extract(nom_fitxer, "^\\d{4}"))
+    ruta <- file.path("../Dades/pisos_turistics", nom_fitxer)
+
+    primera_linia <- readLines(unz(ruta, str_remove(nom_fitxer, "\\.zip$")), n = 1)
+    delim <- if (str_detect(primera_linia, ";")) ";" else ","
+
+    df <- read_delim(
+      unz(ruta, str_remove(nom_fitxer, "\\.zip$")),
+      delim = delim,
+      show_col_types = FALSE,
+      name_repair = "minimal"
+    ) |>
+     rename(any_of(c(Nom_Districte = "NOM_DISTRICTE", Nom_Districte = "DISTRICTE",
+    Nom_Barri = "NOM_BARRI", Nom_Barri = "BARRI")))
+    df |>
+    filter(!is.na(Nom_Barri), !is.na(Nom_Districte)) |>
+    mutate(Any = any) |>
+    select(Any, Nom_Districte, Nom_Barri)
+    }
+
+df_hut <- fitxers_hut |>
+  map(\(f) suppressWarnings(llegir_hut(f))) |>
+  list_rbind()
+
+df_hut <- df_hut |>
+  group_by(Any, Nom_Districte, Nom_Barri) |>
+  summarise(
+    n_llicencies = n(),
+    .groups = "drop")
+    
+```
+
+
+```{r}
+colSums(is.na(df_hut))
+```
+```{r}
+df_padro |>
+  filter(str_detect(Nom_Barri, "Poble|Sants|Gervasi")) |>
+  distinct(Nom_Barri)
+```
+```{r}
+df_hut |>
+  filter(str_detect(Nom_Barri, "Poble|Sants|Gervasi")) |>
+  distinct(Nom_Barri)
+```
+
+
+### Barris amb més pisos HUT
+```{r}
+df_hut |>
+  filter(Any == max(Any)) |>
+  slice_max(n_llicencies, n = 15) |>
+  ggplot(aes(x = n_llicencies, y = reorder(Nom_Barri, n_llicencies))) +
+  geom_col(fill = "steelblue") +
+  scale_x_continuous(labels = scales::comma) +
+  labs(title = paste("Barris amb més pisos turístics (", max(df_hut$Any), ")"),
+       x = "Nombre de llicències", y = NULL)
+```
+
+Per poder calcular la densitat de pisos turístics respecte el total, ens cal importar una nova taula
+
+#Taula locals
+
+```{r}
+  df_locals <- list.files(
+    path       = "../Dades/Locals_us",
+    full.names = TRUE
+  ) |>
+    map(read_csv, show_col_types = FALSE, col_types = cols(.default = "c")) |>
+    list_rbind() |>
+    filter(!is.na(Codi_barri), Codi_barri != "NC") |>
+    mutate(
+      Any        = as.integer(Any),
+      Nombre     = as.numeric(Nombre),
+      Codi_barri = as.integer(Codi_barri)
+    )
+
+  df_habitatges_barri <- df_locals |>
+    filter(Desc_us_desti_principal == "Habitatge", Concepte == "Nombre") |>
+    group_by(Any, Codi_barri, Nom_barri) |>
+    summarise(total_habitatges = sum(Nombre, na.rm = TRUE), .groups = "drop") |>
+    mutate(Nom_barri = case_when(
+      Nom_barri == "el Poble Sec"               ~ "el Poble-sec",
+      Nom_barri == "Sants-Badal"                ~ "Sants - Badal",
+      Nom_barri == "Sant Gervasi- Galvany"      ~ "Sant Gervasi - Galvany",
+      Nom_barri == "Sant Gervasi- la Bonanova"  ~ "Sant Gervasi - la Bonanova",
+      .default = Nom_barri
+    ))
+  
+  df_habitatges_barri <- df_locals |>
+    filter(Desc_us_desti_principal == "Habitatge", Concepte == "Nombre") |>
+    group_by(Any, Codi_barri, Nom_barri) |>
+    summarise(total_habitatges = sum(Nombre, na.rm = TRUE), .groups = "drop") |>
+    mutate(Nom_barri = case_when(
+      Nom_barri == "el Poble Sec"               ~ "el Poble-sec",
+      Nom_barri == "Sants-Badal"                ~ "Sants - Badal",
+      Nom_barri == "Sant Gervasi- Galvany"      ~ "Sant Gervasi - Galvany",
+      Nom_barri == "Sant Gervasi- la Bonanova"  ~ "Sant Gervasi - la Bonanova",
+      .default = Nom_barri
+    ))
+
+df_hut_densitat |>
+    filter(Any == max(Any)) |>
+    left_join(df_habitatges_barri, by = c("Any", "Nom_Barri" = "Nom_barri")) |>
+    mutate(pct_hut_habitatge = n_llicencies / total_habitatges * 100) |>
+    arrange(desc(pct_hut_habitatge)) |>
+    select(Nom_Barri, n_llicencies, total_habitatges, pct_hut_habitatge) |>
+    print(n = Inf)
+
+```
+
+### Preu lloguer vs HUT
+```{r}
+top5_hut <- df_hut_densitat |>
+  filter(Any == max(Any)) |>
+  slice_max(pct_hut, n = 5) |>
+  pull(Nom_Barri)
+
+  df_hut_densitat |>
+    filter(Nom_Barri %in% top5_hut) |>
+    left_join(df_habitatges_barri, by = c("Any", "Nom_Barri" = "Nom_barri")) |>
+    mutate(pct_hut_habitatge = n_llicencies / total_habitatges * 100) |>
+    inner_join(df_lloguers, by = c("Any", "Nom_Barri")) |>
+    group_by(Nom_Barri) |>
+    mutate(
+      idx_hut     = pct_hut_habitatge / pct_hut_habitatge[Any == min(Any)] * 100,
+      idx_lloguer = preu_m2 / preu_m2[Any == min(Any)] * 100
+    ) |>
+    ungroup() |>
+    pivot_longer(cols = c(idx_hut, idx_lloguer),
+                 names_to = "indicador", values_to = "index") |>
+    mutate(indicador = case_when(
+      indicador == "idx_hut"     ~ "HUTs",
+      indicador == "idx_lloguer" ~ "Preu lloguer"
+    )) |>
+    ggplot(aes(x = Any, y = index, color = indicador)) +
+    geom_line(linewidth = 1) + geom_point() +
+    facet_wrap(~ Nom_Barri, ncol = 2) +
+    scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+    labs(title = "Evolució d'HUTs i preu de lloguer (top 5 barris)",
+         x = "Any", y = "Índex (base = primer any)", color = NULL) +
+    theme(legend.position = "top")
+```
+```{r}
+  df_hut_densitat |>
+    filter(Any == 2025) |>
+    anti_join(df_habitatges_barri, by = c("Nom_Barri" = "Nom_barri")) |>
+    pull(Nom_Barri)
+```
+
+
+
+### Mapa de la densitat de pisos turístics
+```{r}
+
+ barris_geo |>
+    left_join(
+      df_hut_densitat |>
+        filter(Any == 2025) |>
+        left_join(df_habitatges_barri, by = c("Nom_Barri" = "Nom_barri")) |>
+        mutate(pct_hut_habitatge = n_llicencies / total_habitatges * 100),
+      by = c("nom_barri" = "Nom_Barri")
+    ) |>
+    ggplot() +
+    geom_sf(aes(fill = pct_hut_habitatge), color = "white", linewidth = 0.2) +
+    scale_fill_viridis_c(
+      option    = "magma",
+      direction = -1,
+      labels    = scales::label_number(suffix = "%"),
+      name      = "% HUT\nsobre habitatges",
+      na.value  = "grey80"
+    ) +
+    labs(title = "Densitat de pisos turístics per barri (2025)",
+         caption = "% sobre el total d'habitatges del barri") +
+    theme_void()
+```
+En aquest mapa és veu molt clarament com la gran concentració de es troben en la dreta de l'Eixample i als seus voltants
+
+
+
+
+# Taula propietaris
+
+Les dades originals classifiquen el tipus de propietari en diverses categories. Per tal de simplificar aquesta classificació. Les hem resumit en 6 categories:
+
+- Persona física — particulars
+- Persona jurídica — societats, empreses i entitats privades
+- Comunitat de propietaris — comunitats de veïns
+- Sector públic — administracions i organismes públics
+- Altres — religioses, associacions, no definit
+- No consta
+
+```{r}
+llegir_propietari_nou <- function(fitxer) {
+  read_csv(fitxer, show_col_types = FALSE) |>
+    filter(Concepte == "Nombre") |>
+    rename(
+      Codi_Districte = Codi_districte,
+      Nom_Districte  = Nom_districte,
+      Codi_Barri     = Codi_barri,
+      Nom_Barri      = Nom_barri
+    ) |>
+    mutate(
+      Nombre = as.numeric(Nombre),
+      tipus_harm = case_when(
+        str_detect(Desc_tipus_propietari, regex("f.sic", ignore_case = TRUE))
+          ~ "Persona física",
+        str_detect(Desc_tipus_propietari, regex("comunitat de propietaris", ignore_case = TRUE))
+          ~ "Comunitat de propietaris",
+        str_detect(Desc_tipus_propietari, regex("societat|an.nim|responsabilitat|entitat|b.ns|uni.temps", ignore_case = TRUE))
+          ~ "Persona jurídica",
+        str_detect(Desc_tipus_propietari, regex("p.blic|administraci|corporaci", ignore_case = TRUE))
+          ~ "Sector públic",
+        str_detect(Desc_tipus_propietari, regex("religi|congregaci|associaci|altres|no definit", ignore_case = TRUE))
+          ~ "Altres",
+        TRUE ~ "No consta"
+      )
+    ) |>
+    group_by(Any, Codi_Districte, Nom_Districte, Codi_Barri, Nom_Barri, tipus_harm) |>
+    summarise(nombre = sum(Nombre, na.rm = TRUE), .groups = "drop")
+}
+
+fitxers_nous <- list.files("../Dades/propietari",
+                           pattern    = "_loc_hab_tipus_propietari\\.csv$",
+                           full.names = TRUE)
+
+df_propietari <- map(fitxers_nous, llegir_propietari_nou) |> list_rbind()
+```
+
+```{r}
+colSums(is.na(df_propietari))
+```
+
+Calculem el tipus de propietari sobre el total.
+La variable que ens interessa per aquest anàlisi serà la proporció de propietaris jurídics, ja que una concentració elevada d'habitatge en mans d'empreses pot significar la financiarització del mercat immobiliari.
+
+```{r}
+df_propietari_barri <- df_propietari |>
+  group_by(Any, Codi_Districte, Nom_Districte, Codi_Barri, Nom_Barri) |>
+  summarise(
+    total_habitatges = sum(nombre,                                       na.rm = TRUE),
+    n_fisica         = sum(nombre[tipus_harm == "Persona física"],       na.rm = TRUE),
+    n_juridica       = sum(nombre[tipus_harm == "Persona jurídica"],     na.rm = TRUE),
+    n_public         = sum(nombre[tipus_harm == "Sector públic"],        na.rm = TRUE),
+    n_comunitat      = sum(nombre[tipus_harm == "Comunitat de propietaris"], na.rm = TRUE),
+    n_altres         = sum(nombre[tipus_harm == "Altres"],               na.rm = TRUE),
+    n_no_consta      = sum(nombre[tipus_harm == "No consta"],            na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  mutate(
+    pct_fisica    = n_fisica    / total_habitatges,
+    pct_juridica  = n_juridica  / total_habitatges,
+    pct_public    = n_public    / total_habitatges,
+    pct_comunitat = n_comunitat / total_habitatges,
+    pct_altres    = n_altres    / total_habitatges,
+    pct_no_consta = n_no_consta / total_habitatges
+  ) |>
+  mutate(Nom_Barri = case_when(
+    Nom_Barri == "el Gòtic"                       ~ "el Barri Gòtic",
+    Nom_Barri == "Sants-Badal"                    ~ "Sants - Badal",
+    Nom_Barri == "el Poble Sec"                   ~ "el Poble-sec",
+    Nom_Barri == "Sant Gervasi- la Bonanova"      ~ "Sant Gervasi - la Bonanova",
+    Nom_Barri == "Sant Gervasi- Galvany"          ~ "Sant Gervasi - Galvany",
+    str_detect(Nom_Barri, "Putget|Putxet")        ~ "el Putxet i el Farró",
+    str_detect(Nom_Barri, "Vila de Gr")           ~ "la Vila de Gràcia",
+    str_detect(Nom_Barri, "Camp de l")            ~ "el Camp de l'Arpa del Clot",
+    str_detect(Nom_Barri, "Sant Pere")            ~ "Sant Pere, Santa Caterina i la Ribera",
+    str_detect(Nom_Barri, "Vallvidrera")          ~ "Vallvidrera, el Tibidabo i les Planes",
+    .default = Nom_Barri
+  ))
+```
+
+```{r}
+  df_propietari_barri |>
+    filter(Any == max(Any)) |>
+    arrange(desc(n_juridica)) |>
+    select(
+      Barri            = Nom_Barri,
+      Districte        = Nom_Districte,
+      `Total prop.`    = total_habitatges,
+      `Prop. jurídics` = n_juridica,
+      `% jurídics`     = pct_juridica
+    ) |>
+    mutate(`% jurídics` = scales::percent(`% jurídics`, accuracy = 0.1)) |>
+    head(20) |>
+    knitr::kable(
+      caption      = paste("Barris amb més propietaris jurídics (", max(df_propietari_barri$Any), ")"),
+      format.args  = list(big.mark = ".")
+    )
+```
+
+
+### Major % de propietari jurídic
+
+```{r}
+df_propietari_barri |>
+  filter(Any == max(Any)) |>
+  slice_max(pct_juridica, n = 15) |>
+  ggplot(aes(x = pct_juridica, y = reorder(Nom_Barri, pct_juridica))) +
+  geom_col(fill = "steelblue") +
+  scale_x_continuous(labels = scales::percent) +
+  labs(title = paste("Barris amb major % de propietari jurídic (", max(df_propietari_barri$Any), ")"),
+       x = "% propietaris jurídics", y = NULL)
+```
+### Major creixement de persones jurídiques
+
+```{r}
+df_propietari_barri |>
+  filter(Any %in% c(2018, 2024)) |>
+  select(Any, Nom_Barri, pct_juridica) |>
+  pivot_wider(names_from = Any, values_from = pct_juridica, names_prefix = "pct_") |>
+  mutate(creixement = pct_2024 - pct_2018) |>
+  slice_max(creixement, n = 15) |>
+  ggplot(aes(x = creixement, y = reorder(Nom_Barri, creixement))) +
+  geom_col(fill = "steelblue") +
+  scale_x_continuous(labels = scales::percent) +
+  labs(title = "Top 15 barris amb major creixement de propietari jurídic (2018–2024)",
+       x = "Increment en punts percentuals", y = NULL)
+```
+
+### Mapa d'intensitat de persones jurídiques
+
+```{r}
+  barris_geo |>
+    left_join(
+      df_propietari_barri |>
+        filter(Any == max(Any)),
+      by = c("nom_barri" = "Nom_Barri")
+    ) |>
+    ggplot() +
+    geom_sf(aes(fill = pct_juridica), color = "white", linewidth = 0.2) +
+    scale_fill_viridis_c(
+      option    = "magma",
+      direction = -1,
+      labels    = scales::percent,
+      name      = "% propietari\njurídic",
+      na.value  = "grey80"
+    ) +
+    labs(
+      title   = "Concentració de propietaris jurídics per barri")+
+    theme_void() +
+    theme(plot.title = element_text(face = "bold"))
+```
+El patró és semblant al que hem vist amb els HUT però ampliant també a les zones de rendes altes.
+
+```{r}
+df_propietari_barri |>
+  filter(Nom_Barri == "la Marina del Prat Vermell") |>
+  select(Any, total_habitatges, n_juridica, pct_juridica) |>
+  arrange(Any)
+```
+Hem notat que en el barri "la Marina del Prat Vermell" tenim una inconsistència en el nombre de propietaris jurídics. Entre l'any 2021 i 2022 veiem un salt anòmal i considerem que és degut a algun error en la classificació en la font de dades.
+
+# Taula cens comercial
+```{r}
+anys_cens <- c(2016, 2019, 2022, 2024)
+
+df_cens <- anys_cens |>
+  map(\(any) {
+    read_csv2(
+      paste0("../Dades/cens_comercial/", any, "_cens_activitats_comercials.csv"),
+      show_col_types = FALSE
+    ) |>
+      mutate(Any = any) |>
+      select(Any, Codi_Barri, Nom_Barri, Codi_Districte, Nom_Districte,
+             Codi_Principal_Activitat, Nom_Principal_Activitat,
+             Codi_Sector_Activitat, Nom_Sector_Activitat, Nom_Grup_Activitat, Nom_Activitat,
+             Nom_Local)
+  }) |>
+  list_rbind()
+```
+## Neteja i transformació de dades
+Mirem el total d'etiquetes en 'Nom_Principal_Activitat' úniques
+```{r}
+count(df_cens, Any, Nom_Principal_Activitat)
+```
+Substituïm l'etiqueta "Sense Informació" i "Sense activitat Econòmica" per NAs
+
+```{r}
+df_cens <- df_cens |>
+    mutate(Nom_Principal_Activitat = na_if(Nom_Principal_Activitat, "Sense informació"),
+           Nom_Principal_Activitat = na_if(Nom_Principal_Activitat, "Sense activitat Econòmica"))
+```
+
+Mirem les etiquetes úniques en 'Nom_Sector_Activitat'
+```{r}
+count(df_cens, Nom_Sector_Activitat)
+```
+
+Unifiquem aquelles categories que son redundants.
+
+```{r}
+df_cens <- df_cens |>
+  mutate(Nom_Sector_Activitat = case_when(
+    str_detect(Nom_Sector_Activitat, "Locals buits") ~ "Locals buits",
+    str_detect(Nom_Sector_Activitat, "Sense informació") ~ "Sense informació",
+    str_detect(Nom_Sector_Activitat, "Comerç al detall") ~ "Comerç al detall",
+    .default = Nom_Sector_Activitat
+  ))
+```
+
+Convertim 'Sense informació' a NA
+```{r}
+
+df_cens <- df_cens |>
+    mutate(Nom_Sector_Activitat = na_if(Nom_Sector_Activitat, "Sense informació"))
+
+ count(df_cens, Nom_Sector_Activitat)
+
+```
+
+```{r}
+ count(df_cens, Nom_Grup_Activitat)
+
+```
+```{r}
+ count(df_cens, Nom_Activitat)
+
+```
+
+```{r}
+
+#Convertim a NA els que tenen '-' com a valor
+df_cens <- df_cens |>
+    mutate(
+        Nom_Grup_Activitat = na_if(Nom_Grup_Activitat, "-"),
+        Nom_Activitat    = na_if(Nom_Activitat, "-")
+    )
+
+#Els eliminem
+df_cens <- df_cens |>
+    filter(!is.na(Nom_Grup_Activitat) | !is.na(Nom_Activitat))
+```
+
+
+
+## EDA
+
+```{r}
+df_cens_pivot <- df_cens |>
+  filter(Any %in% c(2016, 2024), !is.na(Nom_Activitat)) |>
+  count(Any, Nom_Barri, Nom_Activitat) |>
+  group_by(Any, Nom_Barri) |>
+  mutate(pct = n / sum(n)) |>
+  ungroup() |>
+  select(Any, Nom_Barri, Nom_Activitat, pct) |>
+  pivot_wider(names_from = Any, values_from = pct,
+              values_fill = 0, names_prefix = "pct_") |>
+  mutate(canvi = pct_2024 - pct_2016) |>
+  select(Nom_Barri, Nom_Activitat, canvi) |>
+  pivot_wider(names_from = Nom_Activitat, values_from = canvi,
+              values_fill = 0)
+```
+
+```{r}
+df_desplagament_bcn <- df_lloc_naix_simple |>
+  filter(Any %in% c(2015, 2025)) |>
+  group_by(Any, Nom_Barri, LLOC_NAIX) |>
+  summarise(poblacio = sum(Valor, na.rm = TRUE), .groups = "drop") |>
+  group_by(Any, Nom_Barri) |>
+  mutate(pct = poblacio / sum(poblacio)) |>
+  filter(LLOC_NAIX == 1) |>
+  select(Any, Nom_Barri, pct) |>
+  pivot_wider(names_from = Any, values_from = pct, names_prefix = "pct_") |>
+  mutate(canvi_relatiu_bcn = (pct_2025 - pct_2015) / pct_2015) |>
+  select(Nom_Barri, canvi_relatiu_bcn)
+```
+
+```{r}
+correlacions <- df_cens_pivot |>
+  inner_join(df_desplagament_bcn, by = "Nom_Barri") |>
+  select(-Nom_Barri) |>
+  cor(use = "pairwise.complete.obs") |>
+  as.data.frame() |>
+  rownames_to_column("grup") |>
+  select(grup, cor = canvi_relatiu_bcn) |>
+  filter(grup != "canvi_relatiu_bcn") |>
+  arrange(cor)
+
+correlacions |>
+  slice_max(abs(cor), n = 20) |>
+  ggplot(aes(x = cor, y = reorder(grup, cor), fill = cor < 0)) +
+  geom_col() +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
+  scale_fill_manual(values = c("FALSE" = "steelblue", "TRUE" = "darkred"),
+                    guide = "none") +
+  scale_x_continuous(limits = c(-1, 1)) +
+  labs(
+    title = "Tipus de comerç associats al desplaçament de barcelonins",
+    subtitle = "Canvi en quota comercial (2016–2024) vs canvi relatiu de barcelonins (2015–2025)",
+    x = "Correlació de Pearson", y = NULL
+  )
+```
+
+
+```{r}
+df_cens_barri <- df_cens |>
+  group_by(Any, Codi_Barri, Nom_Barri, Codi_Districte, Nom_Districte) |>
+  summarise(
+    total_locals = n(),
+    n_buits      = sum(Nom_Sector_Activitat == "Locals buits",     na.rm = TRUE),
+    n_comerc     = sum(Nom_Sector_Activitat == "Comerç al detall", na.rm = TRUE),
+    n_serveis    = sum(Nom_Sector_Activitat == "Serveis",          na.rm = TRUE),
+    n_reforma    = sum(Nom_Sector_Activitat == "En reforma",       na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  mutate(
+    pct_buits   = n_buits   / total_locals * 100,
+    pct_comerc  = n_comerc  / total_locals * 100,
+    pct_serveis = n_serveis / total_locals * 100
+  )
+```
+
+### Barris amb més % de locals buits
+```{r}
+df_cens_barri |>
+    filter(Any == 2024) |>
+    slice_max(pct_buits, n = 15) |>
+    ggplot(aes(x = pct_buits, y = reorder(Nom_Barri, pct_buits))) +
+    geom_col(fill = "steelblue") +
+    scale_x_continuous(labels = scales::percent_format(scale = 1)) +
+    labs(title = "Barris amb més locals buits (2024)",
+         x = "% locals buits", y = NULL)
+```
+
+
+```{r}
+top10_serveis <- df_cens_barri |>
+  filter(Any %in% c(2016, 2024)) |>
+  select(Any, Nom_Barri, pct_serveis) |>
+  pivot_wider(names_from = Any, values_from = pct_serveis,
+              names_prefix = "pct_") |>
+  mutate(increment = pct_2024 - pct_2016) |>
+  slice_max(increment, n = 10) |>
+  pull(Nom_Barri)
+
+df_cens_barri |>
+  filter(Nom_Barri %in% top10_serveis) |>
+  ggplot(aes(x = Any, y = pct_serveis, color = Nom_Barri)) +
+  geom_line(linewidth = 1) + geom_point() +
+  geom_text(data = ~ filter(.x, Any == 2024),
+            aes(label = Nom_Barri), hjust = -0.1, size = 3) +
+  scale_x_continuous(limits = c(2016, 2027)) +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  theme(legend.position = "none") +
+  labs(title = "Top 10 barris amb major creixement de serveis (2016–2024)",
+       x = "Any", y = "% locals de serveis")
+```
+
+
+### Barris amb major nombre de locals de comerç al detall
+```{r}
+top10_mes_comerc <- df_cens_barri |>
+  filter(Any == 2024) |>
+  slice_max(n_comerc, n = 10) |>
+  pull(Nom_Barri)
+
+df_cens_barri |>
+  filter(Nom_Barri %in% top10_mes_comerc) |>
+  ggplot(aes(x = Any, y = n_comerc, color = Nom_Barri)) +
+  geom_line(linewidth = 1) + geom_point() +
+  geom_text(data = ~ filter(.x, Any == 2024),
+            aes(label = Nom_Barri), hjust = -0.1, size = 3) +
+  scale_x_continuous(limits = c(2016, 2027)) +
+  scale_y_continuous(labels = scales::comma) +
+  theme(legend.position = "none") +
+  labs(title = "Top 10 barris amb més locals de comerç al detall
+(2024)",
+       x = "Any", y = "Nombre de locals")
+```
+En el gràfic previ veiem que la tendència del la quantitat de locals de proximitat és negativa. Per altra banda, veien que hi ha tres barris que entre el 2022 i el 2024, van tenir un augment (El Raval, El Barri Gòtic i Sant Pere, Sta. Caterina i la Rivera), tots tres formant part del mateix districte. Anem a veure quins negocis han augmentat més. 
+
+
+```{r}
+df_cens |>
+  filter(Nom_Barri %in% c("el Barri Gòtic", "el Raval", "Sant Pere, Santa Caterina i la Ribera"),
+         Nom_Sector_Activitat == "Comerç al detall",
+         Any %in% c(2022, 2024)) |>
+  count(Any, Nom_Barri, Nom_Activitat) |>
+  pivot_wider(names_from = Any, values_from = n, values_fill = 0) |>
+  mutate(increment = `2024` - `2022`) |>
+  group_by(Nom_Barri) |>
+  slice_max(increment, n = 3) |>
+  ungroup()
+```
+  
+Barri Gòtic: Amb un increment de 58 tendes de souvenirs, estem clarament en un barri turistificat. El creixement de forns i pastisseries molt probablement es deu a alguna cadena i no a forns de ordinaris.
+
+Sant Pere: Tot i que també han incrementat les tendes de souvenirs, sembla que en aquest cas el comerç del barri s'ha centrat més en tendes de roba i joieria, molt probablement també dirigides al turisme.
+
+El Raval: Aquí el creixement de les tendes ha estat més modest i no tant dirigits al turisme.
+
+
+```{r}
+  df_cens |>
+    filter(Nom_Activitat == "Pa, pastisseria i làctics",
+           Nom_Barri %in% c("el Barri Gòtic", "el Raval", "Sant Pere,
+  Santa Caterina i la Ribera"),
+           Any == 2024) |>
+    count(Nom_Local, sort = TRUE) |>
+    head(20)
+```
+
+Ens aquest interval de dos anys ha hagut un increment de 14 locals '365', una famosa cadena de forn de pa. Amb això veiem és que no es tracta d'un creixement en el sector dels forns de pa sinó del creixement d'una cadena específica.
+
+
+```{r}
+df_cens |>
+  filter(Nom_Activitat == "Souvenirs", Any == 2024) |>
+  count(Nom_Barri, sort=TRUE)
+```
+
+Si veiem el total de tendes de souvenirs per barri, ens podem fer una idea de la geografía turistica de Barcelona. El barri gòtic és, amb molta diferència, qui més en té, convertint-se en l'epicentre turístic de la ciutat.  
+
+```{r}
+ df_cens |>
+    filter(Nom_Barri == "la Sagrada Família", Any == 2016) |>
+    count(Nom_Activitat, sort = TRUE) |>
+    slice_max(n, n = 10)
+```
+
+#Taula Nivell Educatiu
+
+```{r}
+df_edu <- list.files(
+  path       = "../Dades/edu",
+  full.names = TRUE
+) |>
+  map(read_csv, show_col_types = FALSE, na = c("", "..")) |>
+  list_rbind() |>
+  mutate(
+    Any   = year(as.Date(Data_Referencia)),
+    Valor = as.numeric(Valor),
+    Valor = replace_na(Valor, 0)
+  ) |>
+  select(-Data_Referencia)
+```
+
+
+```{r}
+colSums(is.na(df_edu))
+
+```
+
+```{r}
+df_edu <- df_edu |>
+    filter(NIV_EDUCA_esta != 6) |>
+    group_by(Any, Codi_Districte, Nom_Districte, Codi_Barri, Nom_Barri) |>
+    summarise(
+      total      = sum(Valor, na.rm = TRUE),
+      n_edu_baixa = sum(Valor[NIV_EDUCA_esta %in% c(1, 2)], na.rm = TRUE),
+      n_edu_mitja = sum(Valor[NIV_EDUCA_esta %in% c(3, 4)], na.rm = TRUE),
+      n_edu_alta  = sum(Valor[NIV_EDUCA_esta == 5],          na.rm = TRUE),
+      .groups = "drop"
+    ) |>
+    mutate(
+      pct_edu_baixa = n_edu_baixa / total,
+      pct_edu_mitja = n_edu_mitja / total,
+      pct_edu_alta  = n_edu_alta  / total
+      )
+    
+```
+
+
+```{r}
+ any_min <- min(df_edu$Any)
+  any_max <- max(df_edu$Any)
+
+  df_edu |>
+    filter(Any %in% c(any_min, any_max)) |>
+    select(Any, Nom_Barri, Nom_Districte, pct_edu_alta) |>
+    pivot_wider(names_from = Any, values_from = pct_edu_alta,
+                names_prefix = "pct_") |>
+    mutate(increment = .data[[paste0("pct_", any_max)]] -
+                       .data[[paste0("pct_", any_min)]]) |>
+    slice_max(increment, n = 15) |>
+    ggplot(aes(x = increment, y = reorder(Nom_Barri, increment), fill = Nom_Districte)) +
+    geom_col() +
+    scale_x_continuous(labels = scales::percent) +
+    labs(
+      title = paste0("Barris amb major creixement d'educació alta (", any_min, "–", any_max, ")"),
+      x     = "Increment en punts percentuals",
+      y     = NULL,
+      fill  = NULL
+    ) +
+    theme_minimal() +
+    theme(legend.position = "bottom")
+```
+```{r}
+ df_edu |>
+    filter(Any %in% c(any_min, any_max)) |>
+    select(Any, Nom_Barri, Nom_Districte, pct_edu_alta) |>
+    pivot_wider(names_from = Any, values_from = pct_edu_alta,
+                names_prefix = "pct_") |>
+    mutate(increment = .data[[paste0("pct_", any_max)]] -
+                       .data[[paste0("pct_", any_min)]]) |>
+    slice_max(increment, n = 15)
+```
+
+### Nivell educatiu dominant per barri
+```{r}
+barris_geo |>
+    left_join(
+      df_edu |> filter(Any == 2014),
+      by = c("nom_barri" = "Nom_Barri")
+    ) |>
+    mutate(grup_dominant = case_when(
+      pct_edu_alta  == pmax(pct_edu_alta, pct_edu_mitja, pct_edu_baixa) ~ "Educació alta",
+      pct_edu_mitja == pmax(pct_edu_alta, pct_edu_mitja, pct_edu_baixa) ~ "Educació mitjana",
+      pct_edu_baixa == pmax(pct_edu_alta, pct_edu_mitja, pct_edu_baixa) ~ "Educació baixa"
+    )) |>
+    ggplot() +
+    geom_sf(aes(fill = grup_dominant), color = "white", linewidth = 0.2) +
+    scale_fill_brewer(palette = "Set2", name = NULL, na.value = "grey80") +
+    labs(title = paste("Grup educatiu dominant per barri (", max(df_edu$Any), ")")) +
+    theme_void()
+```
+És interessant veure com aquest mapa coincideix molt amb el mapa de la renda que hem vist abans, donant a entendre que un nivell alt d'educació amb  benestar social.
+#LAG
+
+```{r}
+  df_temporal_complet <- df_lloguers |>
+    select(Any, Nom_Barri, preu_m2) |>
+    inner_join(df_hut_densitat    |> select(Any, Nom_Barri, pct_hut),          by = c("Any", "Nom_Barri")) |>
+    inner_join(df_regio_rica      |> select(Any, Nom_Barri, pct_regio_rica),    by = c("Any", "Nom_Barri")) |>
+    inner_join(df_origen_simple_barri |> select(Any, Nom_Barri, pct_barcelona), by = c("Any", "Nom_Barri")) |>
+    inner_join(df_padro           |> select(Any, Nom_Barri, pct_joves_adults),  by = c("Any", "Nom_Barri")) |>
+    inner_join(df_renda_barri     |> select(Any, Nom_Barri, renda_mitjana),     by = c("Any", "Nom_Barri")) |>
+    inner_join(df_propietari_barri |> select(Any, Nom_Barri, pct_juridica),     by = c("Any", "Nom_Barri"))
+
+  variables <- c("preu_m2", "pct_hut", "pct_regio_rica", "pct_barcelona",
+                 "pct_joves_adults", "renda_mitjana", "pct_juridica")
+
+  resultats_lag <- expand.grid(x = variables, y = variables, stringsAsFactors = FALSE) |>
+    filter(x != y) |>
+    pmap_dfr(\(x, y) {
+      contemporani <- cor(df_temporal_complet[[x]], df_temporal_complet[[y]],
+                          use = "pairwise.complete.obs")
+      lag1 <- df_temporal_complet |>
+        select(Nom_Barri, Any, all_of(c(x, y))) |>
+        inner_join(
+          df_temporal_complet |>
+            select(Nom_Barri, Any, all_of(y)) |>
+            mutate(Any = Any - 1) |>
+            rename(y_lag = all_of(y)),
+          by = c("Nom_Barri", "Any")
+        ) |>
+        summarise(cor = cor(.data[[x]], y_lag, use = "pairwise.complete.obs")) |>
+        pull(cor)
+
+      tibble(x, y, contemporani, lag1, diferencia = lag1 - contemporani)
+    })
+  
+  resultats_lag |>
+    ggplot(aes(x = y, y = x, fill = diferencia)) +
+    geom_tile(color = "white") +
+    geom_text(aes(label = round(diferencia, 3)), size = 3) +
+    scale_fill_distiller(palette = "RdBu", direction = 1,
+                         limits = c(-0.02, 0.02), oob = scales::squish,
+                         name = "lag1 - contemporani") +
+    labs(title = "Precedència temporal entre variables (positiu = fila prediu columna)",
+         x = "Variable y (t+1)", y = "Variable x (t)") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+resultats_lag |>
+    arrange(desc(diferencia)) |>
+    mutate(across(where(is.numeric), \(x) round(x, 4))) |>
+    print(n = Inf)
+```
+Els resultats mostren que l'encariment del lloguer precedeix l'arribada d'estrangers de regions riques, l'increment de propietaris jurídics i l'augment de HUTs, suggerint que aquests tres fenòmens actuen com a conseqüència de l'encariment i no com a factors desencadenants. A més, la pèrdua de població nascuda a Barcelona mostra una lleugera precedència sobre l'encariment del lloguer, apuntant al desplaçament de residents locals com el senyal més primerenc del procés.
+
+
+# Model
+
+Preparem les dades per entrenar el model. Per a cada variable, calcularem la diferència entre els d
+```{r}
+
+#Renda
+diff_renda <- df_renda_barri |>
+    filter(Any %in% c(2015, 2023)) |>
+    select(Any, Nom_Barri, renda_mitjana) |>
+    pivot_wider(names_from = Any, values_from = renda_mitjana, names_prefix = "renda_") |>
+    mutate(diff_renda = (renda_2023 - renda_2015) / 8) |>
+    select(Nom_Barri, diff_renda)
+
+diff_regio_rica <- df_regio_rica |>
+  filter(Any %in% c(2015, 2025)) |>
+  select(Any, Nom_Barri, pct_regio_rica) |>
+  pivot_wider(names_from = Any, values_from = pct_regio_rica, names_prefix = "regio_") |>
+  mutate(diff_regio_rica = (regio_2025 - regio_2015) / 10) |>
+  select(Nom_Barri, diff_regio_rica)
+
+# Lloguer
+diff_lloguer <- df_lloguers |>
+  filter(Any %in% c(2014, 2025)) |>
+  pivot_wider(names_from = Any, values_from = preu_m2, names_prefix = "lloguer_") |>
+  mutate(diff_lloguer = (lloguer_2025 - lloguer_2014) / 11) |>
+  select(Nom_Barri, diff_lloguer)
+
+# Població local
+diff_bcn <- df_origen_simple_barri |>
+  filter(Any %in% c(2015, 2025)) |>
+  select(Any, Nom_Barri, pct_barcelona) |>
+  pivot_wider(names_from = Any, values_from = pct_barcelona, names_prefix = "bcn_") |>
+  mutate(diff_bcn = (bcn_2025 - bcn_2015) / 10) |>
+  select(Nom_Barri, diff_bcn)
+
+# Joves adults
+diff_joves <- df_padro |>
+  filter(Any %in% c(2015, 2025)) |>
+  select(Any, Nom_Barri, pct_joves_adults) |>
+  pivot_wider(names_from = Any, values_from = pct_joves_adults, names_prefix = "joves_") |>
+  mutate(diff_joves = (joves_2025 - joves_2015) / 10) |>
+  select(Nom_Barri, diff_joves)
+
+# Serveis i locals buits
+diff_comerç <- df_cens_barri |>
+  filter(Any %in% c(2016, 2024)) |>
+  select(Any, Nom_Barri, pct_serveis, pct_buits) |>
+  pivot_wider(names_from = Any, values_from = c(pct_serveis, pct_buits)) |>
+  mutate(
+    diff_serveis = (pct_serveis_2024 - pct_serveis_2016) / 8,
+    diff_buits   = (pct_buits_2024   - pct_buits_2016)   / 8
+  ) |>
+  select(Nom_Barri, diff_serveis, diff_buits)
+
+# HUTs
+diff_hut <- df_padro |>
+  filter(Any %in% c(2018, 2025)) |>
+  distinct(Any, Nom_Barri) |>
+  left_join(
+    df_hut_densitat |> filter(Any %in% c(2018, 2025)) |> select(Any, Nom_Barri, pct_hut),
+    by = c("Any", "Nom_Barri")
+  ) |>
+  mutate(pct_hut = replace_na(pct_hut, 0)) |>
+  pivot_wider(names_from = Any, values_from = pct_hut, names_prefix = "hut_") |>
+  mutate(diff_hut = (hut_2025 - hut_2018) / 7) |>
+  select(Nom_Barri, diff_hut)
+
+#Tipus de propietaris
+diff_juridic <- df_propietari_barri |>
+  filter(Any %in% c(2018, 2024)) |>
+  select(Any, Nom_Barri, pct_juridica) |>
+  pivot_wider(names_from = Any, values_from = pct_juridica, names_prefix = "juridic_") |>
+  mutate(
+    diff_juridic = (juridic_2024 - juridic_2018) / 6,
+    diff_juridic = if_else(Nom_Barri == "la Marina del Prat Vermell", NA_real_, diff_juridic)
+  ) |>
+  select(Nom_Barri, diff_juridic)
+
+#Educació
+diff_edu <- df_edu |>
+    filter(Any %in% c(2014, 2025)) |>
+    select(Any, Nom_Barri, pct_edu_alta) |>
+    pivot_wider(names_from = Any, values_from = pct_edu_alta, names_prefix = "edu_") |>
+    mutate(diff_edu = (edu_2025 - edu_2014) / 11) |>
+    select(Nom_Barri, diff_edu)
+
+# Unió final
+df_diff <- diff_renda |>
+  inner_join(diff_lloguer, by = "Nom_Barri") |>
+  inner_join(diff_regio_rica, by = "Nom_Barri") |>
+  inner_join(diff_bcn, by = "Nom_Barri") |>
+  inner_join(diff_joves, by = "Nom_Barri") |>
+  #inner_join(diff_comerç, by = "Nom_Barri") |>
+  inner_join(diff_hut, by = "Nom_Barri") |>
+  inner_join(diff_juridic,  by = "Nom_Barri") |>
+  inner_join(diff_edu,        by = "Nom_Barri")
+
+
+df_diff <- df_diff |>
+ mutate(diff_juridic = replace_na(diff_juridic, mean(diff_juridic, na.rm = TRUE))) |>
+ mutate(diff_hut = replace_na(diff_hut, 0))
+
+# Winsoritza sobre dades brutes (abans d'escalar)
+winsorize <- function(x, p = 0.05) {
+  q <- quantile(x, c(p, 1 - p), na.rm = TRUE)
+  pmin(pmax(x, q[1]), q[2])
+}
+
+df_diff_wins <- df_diff |>
+  mutate(across(where(is.numeric), winsorize))
+
+df_indicadors <- df_diff_wins |> column_to_rownames("Nom_Barri") |> scale()
+
+```
+
+## Outliers
+
+Tractem els outliers extrems amb windsorize
+
+```{r}
+# Winsoritza cada variable al percentil 5–95 per eliminar outliers extrems
+winsorize <- function(x, p = 0.05) {
+  q <- quantile(x, c(p, 1 - p), na.rm = TRUE)
+  pmin(pmax(x, q[1]), q[2])
+}
+
+# winsorize ja aplicat al chunk anterior sobre dades brutes
+```
+
+```{r}
+as.data.frame(df_indicadors) |>
+  rownames_to_column("Nom_Barri") |>
+  pivot_longer(cols = -Nom_Barri, names_to = "indicador", values_to = "valor") |>
+  ggplot(aes(x = indicador, y = valor)) +
+  geom_boxplot(fill = "steelblue", alpha = 0.6, outlier.color = "darkred") +
+  geom_text(
+    data = ~ filter(., abs(valor - median(valor)) > 2 * IQR(valor)),
+    aes(label = Nom_Barri), size = 2.5, hjust = -0.1
+  ) +
+  facet_wrap(~ indicador, scales = "free") +
+  theme(axis.text.x = element_blank()) +
+  labs(title = "Distribució dels indicadors de canvi per barri",
+       x = NULL, y = "Taxa de canvi anual")
+```
+
+## Matriu de correlació
+```{r}
+mat_cor <- cor(df_indicadors, use = "pairwise.complete.obs")
+
+ggcorrplot(
+  mat_cor,
+  method   = "square",
+  type     = "upper",
+  lab      = TRUE,
+  lab_size = 3,
+  colors   = c("#d73027", "white", "#1a9850"),
+  title    = "Correlació entre indicadors de canvi",
+  ggtheme  = theme_minimal()
+)
+```
+
+
+```{r}
+#renda_base <- df_renda_barri |>
+#  filter(Any == 2015) |>
+#  select(Nom_Barri, renda_base = renda_mitjana)  
+
+df_model <- df_indicadors  # ja winsoritzat i escalat
+```
+
+#PCA
+
+```{r}
+#PCA
+pca <- prcomp(df_model, center = TRUE, scale. = FALSE)
+
+#Variança explicada
+fviz_eig(pca, addlabels = TRUE,
+         main = "Vàriancia explicada per cada PCA")
+```
+
+```{r}
+  moran.test(barris_sf$PC1, lw, zero.policy = TRUE)
+```
+
+```{r}
+fviz_pca_var(pca,
+             col.var = "contrib",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE,
+             title = "Contribució de cada variable als PCs")
+```
+```{r}
+pca$rotation[, 1] |>
+    sort(decreasing = TRUE) |>
+    as.data.frame() |>
+    rownames_to_column("variable") |>
+    rename(loading = 2) |>
+    ggplot(aes(x = loading, y = reorder(variable, loading), fill = loading > 0)) +
+    geom_col() +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
+    scale_fill_manual(values = c("TRUE" = "steelblue", "FALSE" = "darkred"), guide = "none") +
+    labs(title = "Contribució de cada variable al PC1",
+         x = "Loading", y = NULL)
+```
+
+
+```{r}
+#df_pca_scores <- as.data.frame(pca$x[, 1:4])
+
+fviz_nbclust(df_model, kmeans, method = "silhouette")
+```
+
+```{r}
+set.seed(42)
+km <- kmeans(df_model, centers = 4, nstart = 25)
+
+clusters_barri <- tibble(
+  Nom_Barri = rownames(df_model),
+  cluster   = as.factor(km$cluster)
+)
+
+fviz_cluster(km, data = df_model,
+             ellipse.type = "convex",
+             palette = "jco",
+             ggtheme = theme_minimal(),
+             main = "Clustering de barris de Barcelona")
+```
+```{r}
+  clusters_barri |>
+    group_by(cluster) |>
+    summarise(n = n(), .groups = "drop")
+```
+
+```{r}
+  clusters_barri |>
+    arrange(cluster) |>
+    print(n = Inf)
+```
+
+```{r}
+  df_diff |>
+    inner_join(clusters_barri, by = "Nom_Barri") |>
+    filter(cluster == 3) |>
+    select(Nom_Barri, diff_renda, diff_edu, diff_lloguer, diff_hut) |>
+    arrange(diff_renda)
+```
+
+
+```{r}
+ etiquetes_cluster <- c(
+    "1" = "Perifèric",
+    "2" = "Acomodat",
+    "3" = "Gentrificat",
+    "4" = "Transició"
+  )
+
+  barris_geo |>
+    left_join(
+      clusters_barri |>
+        mutate(cluster = recode(as.character(cluster), !!!etiquetes_cluster) |>
+                 factor(levels = etiquetes_cluster)),
+      by = c("nom_barri" = "Nom_Barri")
+    ) |>
+    ggplot() +
+    geom_sf(aes(fill = cluster), color = "white", linewidth = 0.3) +
+    scale_fill_brewer(palette = "Set2", name = "Cluster", na.value = "grey80") +
+    labs(title = "Clustering de barris de Barcelona per indicadors de gentrificació") +
+    theme_void()
+```
+
+
+#Contagi entre clusters
+```{r}
+library(spdep)
+
+# PC1 com a score de gentrificació
+df_scores <- tibble(
+  Nom_Barri = rownames(df_model),
+  PC1 = pca$x[, 1]
+)
+
+barris_sf <- barris_geo |>
+  left_join(df_scores, by = c("nom_barri" = "Nom_Barri"))
+
+# Matriu de pesos espacials (veïnatge per contigüitat)
+nb <- poly2nb(barris_sf, queen = TRUE)
+lw <- nb2listw(nb, style = "W", zero.policy = TRUE)
+
+# Test de Moran
+moran.test(barris_sf$PC1, lw, zero.policy = TRUE)
+
+
+```
+```{r}
+moran.plot(
+  barris_sf$PC1, lw,
+  zero.policy = TRUE,
+  xlab = "Score de gentrificació (PC1)",
+  ylab = "Mitjana dels veïns",
+  main = "Diagrama de Moran — Contagi de la gentrificació"
+)
+```
+
+
+
+#Desplaçament de barcelonins
+```{r}
+base_2015 <- df_origen_simple_barri |>
+  filter(Any == 2015) |>
+  select(Nom_Barri, pct_base = pct_barcelona)
+
+df_canvi_bcn <- df_origen_simple_barri |>
+  filter(Any > 2015) |>
+  select(Any, Nom_Barri, pct_barcelona) |>
+  inner_join(base_2015, by = "Nom_Barri") |>
+  mutate(canvi_bcn = pct_barcelona - pct_base) |>
+  select(Any, Nom_Barri, canvi_bcn)
+
+```
+
+```{r}
+  # clusters_barri ja definit al chunk del kmeans
+
+  df_flux |>
+    inner_join(clusters_barri, by = c("Nom_Barri_Origen" = "Nom_Barri")) |>
+    rename(cluster_origen = cluster) |>
+    inner_join(clusters_barri, by = c("Nom_Barri_Dest" = "Nom_Barri")) |>
+    rename(cluster_dest = cluster) |>
+    group_by(cluster_origen, cluster_dest) |>
+    summarise(total = sum(Valor, na.rm = TRUE), .groups = "drop") |>
+    ggplot(aes(x = cluster_origen, y = cluster_dest, fill = total)) +
+    geom_tile(color = "white") +
+    geom_text(aes(label = scales::comma(total)), size = 3) +
+    scale_fill_viridis_c(option = "magma", direction = -1, labels = scales::comma) +
+    labs(
+      title = "Fluxos de moviment entre clusters",
+      x = "Cluster origen", y = "Cluster destinació",
+      fill = "Persones"
+    ) +
+    theme_minimal()
+```
+```{r}
+  df_flux |>
+    inner_join(clusters_barri, by = c("Nom_Barri_Origen" = "Nom_Barri")) |>
+    rename(cluster_origen = cluster) |>
+    inner_join(clusters_barri, by = c("Nom_Barri_Dest" = "Nom_Barri")) |>
+    rename(cluster_dest = cluster) |>
+    group_by(cluster_origen, cluster_dest) |>
+    summarise(total = sum(Valor, na.rm = TRUE), .groups = "drop") |>
+    mutate(
+      cluster_origen = recode(as.character(cluster_origen),
+        "1" = "Perifèric", "2" = "Acomodat",
+        "3" = "Gentrificat", "4" = "En transició"),
+      cluster_dest = recode(as.character(cluster_dest),
+        "1" = "Perifèric", "2" = "Acomodat",
+        "3" = "Gentrificat", "4" = "En transició")
+    ) |>
+    arrange(cluster_origen, cluster_dest) |>
+    print(n = Inf)
+```
+
+```{r}
+ library(networkD3)
+
+  flux_clusters <- df_flux |>
+    inner_join(clusters_barri, by = c("Nom_Barri_Origen" = "Nom_Barri")) |>
+    rename(cluster_origen = cluster) |>
+    inner_join(clusters_barri, by = c("Nom_Barri_Dest" = "Nom_Barri")) |>
+    rename(cluster_dest = cluster) |>
+    group_by(cluster_origen, cluster_dest) |>
+    summarise(total = sum(Valor, na.rm = TRUE), .groups = "drop")
+
+  nodes <- data.frame(name = c(
+    "Perifèric (origen)", "Acomodat (origen)", "Gentrificat (origen)", "En transició (origen)",
+    "Perifèric (dest)",   "Acomodat (dest)",   "Gentrificat (dest)",   "En transició (dest)"
+  ))
+
+  links <- flux_clusters |>
+    mutate(
+      source = as.integer(cluster_origen) - 1,
+      target = as.integer(cluster_dest) - 1 + 4
+    ) |>
+    select(source, target, value = total) |>
+    as.data.frame()
+
+  sankeyNetwork(
+    Links      = links,
+    Nodes      = nodes,
+    Source     = "source",
+    Target     = "target",
+    Value      = "value",
+    NodeID     = "name",
+    fontSize   = 14,
+    nodeWidth  = 30,
+    sinksRight = FALSE
+  )
+```
+
+
+
+#Export per shiny
+
+```{r exportacio_shiny}
+  df_clusters_export <- df_diff |>
+    inner_join(clusters_barri, by = "Nom_Barri")
+
+  df_temporal_export <- df_lloguers |>
+    select(Any, Nom_Barri, preu_m2) |>
+    left_join(df_renda_barri      |> select(Any, Nom_Barri, renda_mitjana),    by = c("Any", "Nom_Barri")) |>
+    left_join(df_padro            |> select(Any, Nom_Barri, pct_joves_adults), by = c("Any", "Nom_Barri")) |>
+    left_join(df_origen_simple_barri |> select(Any, Nom_Barri, pct_barcelona), by = c("Any", "Nom_Barri")) |>
+    left_join(df_hut_densitat     |> select(Any, Nom_Barri, pct_hut) |> mutate(pct_hut = pct_hut / 100), by = c("Any",
+  "Nom_Barri")) |>
+    left_join(df_regio_rica       |> select(Any, Nom_Barri, pct_regio_rica),   by = c("Any", "Nom_Barri")) |>
+    left_join(df_propietari_barri |> select(Any, Nom_Barri, pct_juridica),     by = c("Any", "Nom_Barri")) |>
+    left_join(df_edu              |> select(Any, Nom_Barri, pct_edu_alta),     by = c("Any", "Nom_Barri")) |>
+  left_join(df_canvi_bcn, by = c("Any", "Nom_Barri")
+  ) |>
+    mutate(pct_hut = replace_na(pct_hut, 0))
+
+  saveRDS(df_clusters_export,                   "shiny/df_clusters.rds")
+  saveRDS(df_temporal_export,                   "shiny/df_temporal.rds")
+  saveRDS(df_padro,                             "shiny/df_padro_barri.rds")
+  sf::st_write(barris_geo |> sf::st_transform(4326), "shiny/barris_geo.geojson", delete_dsn = TRUE)
+```
+
+
+
+
+
+
