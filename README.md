@@ -10,6 +10,8 @@ Autor: David Piñol Navas
 
 ## Aplicació Shiny
 
+**Link:** https://y1u4ne-david-pi0ol0navas.shinyapps.io/gentrificacio-barcelona/
+
 L'app visualitza cinc panells:
 
 | Panell | Descripció |
