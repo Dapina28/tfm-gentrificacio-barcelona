@@ -21,6 +21,7 @@ library(ggcorrplot)
 library(shiny)
 library(leaflet)
 library(sf)
+library(spdep)
 
 ```
 
@@ -829,29 +830,57 @@ Curiosament, els barris amb el lloguer més alts son més alts que els barris m�
 El més significatiu és que, a part de Diagonal Mar, la resta de barris que més s'han encarit són els barris perifèrics i obrers.
 
 ```{r}
+  df_creixement_lloguer <- df_lloguers |>
+    filter(Any %in% c(2014, 2025)) |>
+    pivot_wider(names_from = Any, values_from = preu_m2, names_prefix = "preu_") |>
+    mutate(creixement_pct = (preu_2025 - preu_2014) / preu_2014)
+
+  llindar_p4 <- df_creixement_lloguer |>
+    slice_max(creixement_pct, n = 5) |>
+    slice_min(creixement_pct, n = 1) |>
+    pull(creixement_pct)
+
   barris_geo |>
-    left_join(
-      df_lloguers |>
-        filter(Any %in% c(2014, 2025)) |>
-        pivot_wider(names_from = Any, values_from = preu_m2, names_prefix = "preu_") |>
-        mutate(creixement_abs = preu_2025 - preu_2014),
-      by = c("nom_barri" = "Nom_Barri")
-    ) |>
+    left_join(df_creixement_lloguer, by = c("nom_barri" = "Nom_Barri")) |>
     ggplot() +
-    geom_sf(aes(fill = creixement_abs), color = "white", linewidth = 0.2) +
+    geom_sf(aes(fill = creixement_pct), color = "white", linewidth = 0.2) +
     scale_fill_viridis_c(
       option    = "magma",
       direction = -1,
-      labels    = scales::label_number(suffix = " €/m²"),
-      name      = "Increment\nabsolut",
+      limits    = c(NA, llindar_p4),
+      oob       = scales::squish,
+      labels    = scales::percent_format(accuracy = 1),
+      name      = "Increment\nrelatiu",
       na.value  = "grey80"
     ) +
     labs(
-      title   = "Creixement absolut del preu de lloguer per barri (2014–2025)",
-      caption = "La Marina del Prat Vermell s'exclou per valors atípics"
+      title   = "Creixement relatiu del preu de lloguer per barri (2014–2025)",
+      caption = "Els 4 barris amb major increment queden agrupats al color màxim"
     ) +
     theme_void()
 ```
+```{r}
+  df_creixement_lloguer |>
+    left_join(
+      df_lloguers |> filter(Any == 2014) |> select(Nom_Barri, preu_base = preu_m2),
+      by = "Nom_Barri"
+    ) |>
+    arrange(desc(creixement_pct)) |>
+    mutate(
+      creixement_pct = scales::percent(creixement_pct, accuracy = 0.1),
+      preu_2014      = scales::number(preu_base,  suffix = " €/m²", accuracy = 0.01),
+      preu_2025      = scales::number(preu_2025, suffix = " €/m²", accuracy = 0.01)
+    ) |>
+    select(
+      Barri       = Nom_Barri,
+      `Preu 2014` = preu_2014,
+      `Preu 2025` = preu_2025,
+      `Increment` = creixement_pct
+    ) |>
+    head(20) |>
+    knitr::kable(caption = "Top 20 barris amb major creixement relatiu del preu de lloguer (2014–2025)")
+```
+
 Amb aquest mapa confirmem que la perifèria és la més afectada per l'increment dels preus del lloguer i es destaca el cas de la Marina del Prat Vermell.
 
 ### Evolució preu compra vs preu lloguer
@@ -985,7 +1014,15 @@ df_hut <- df_hut |>
   group_by(Any, Nom_Districte, Nom_Barri) |>
   summarise(
     n_llicencies = n(),
-    .groups = "drop")
+    .groups = "drop"
+  ) |>
+  mutate(Nom_Barri = case_when(
+    Nom_Barri == "el Poble Sec"              ~ "el Poble-sec",
+    Nom_Barri == "Sants-Badal"               ~ "Sants - Badal",
+    Nom_Barri == "Sant Gervasi- Galvany"     ~ "Sant Gervasi - Galvany",
+    Nom_Barri == "Sant Gervasi- la Bonanova" ~ "Sant Gervasi - la Bonanova",
+    .default = Nom_Barri
+  ))
     
 ```
 
@@ -1022,50 +1059,49 @@ Per poder calcular la densitat de pisos turístics respecte el total, ens cal im
 #Taula locals
 
 ```{r}
-  df_locals <- list.files(
-    path       = "../Dades/Locals_us",
-    full.names = TRUE
-  ) |>
-    map(read_csv, show_col_types = FALSE, col_types = cols(.default = "c")) |>
-    list_rbind() |>
-    filter(!is.na(Codi_barri), Codi_barri != "NC") |>
-    mutate(
-      Any        = as.integer(Any),
-      Nombre     = as.numeric(Nombre),
-      Codi_barri = as.integer(Codi_barri)
-    )
+df_locals <- list.files(
+  path       = "../Dades/Locals_us",
+  full.names = TRUE
+) |>
+  map(read_csv, show_col_types = FALSE, col_types = cols(.default = "c")) |>
+  list_rbind() |>
+  filter(!is.na(Codi_barri), Codi_barri != "NC") |>
+  mutate(
+    Any        = as.integer(Any),
+    Nombre     = as.numeric(Nombre),
+    Codi_barri = as.integer(Codi_barri)
+  )
 
-  df_habitatges_barri <- df_locals |>
-    filter(Desc_us_desti_principal == "Habitatge", Concepte == "Nombre") |>
-    group_by(Any, Codi_barri, Nom_barri) |>
-    summarise(total_habitatges = sum(Nombre, na.rm = TRUE), .groups = "drop") |>
-    mutate(Nom_barri = case_when(
-      Nom_barri == "el Poble Sec"               ~ "el Poble-sec",
-      Nom_barri == "Sants-Badal"                ~ "Sants - Badal",
-      Nom_barri == "Sant Gervasi- Galvany"      ~ "Sant Gervasi - Galvany",
-      Nom_barri == "Sant Gervasi- la Bonanova"  ~ "Sant Gervasi - la Bonanova",
-      .default = Nom_barri
-    ))
-  
-  df_habitatges_barri <- df_locals |>
-    filter(Desc_us_desti_principal == "Habitatge", Concepte == "Nombre") |>
-    group_by(Any, Codi_barri, Nom_barri) |>
-    summarise(total_habitatges = sum(Nombre, na.rm = TRUE), .groups = "drop") |>
-    mutate(Nom_barri = case_when(
-      Nom_barri == "el Poble Sec"               ~ "el Poble-sec",
-      Nom_barri == "Sants-Badal"                ~ "Sants - Badal",
-      Nom_barri == "Sant Gervasi- Galvany"      ~ "Sant Gervasi - Galvany",
-      Nom_barri == "Sant Gervasi- la Bonanova"  ~ "Sant Gervasi - la Bonanova",
-      .default = Nom_barri
-    ))
+df_habitatges_barri <- df_locals |>
+  filter(Desc_us_desti_principal == "Habitatge", Concepte == "Nombre") |>
+  group_by(Any, Codi_barri, Nom_barri) |>
+  summarise(total_habitatges = sum(Nombre, na.rm = TRUE), .groups = "drop") |>
+  mutate(Nom_barri = case_when(
+    Nom_barri == "el Poble Sec"               ~ "el Poble-sec",
+    Nom_barri == "Sants-Badal"                ~ "Sants - Badal",
+    Nom_barri == "Sant Gervasi- Galvany"      ~ "Sant Gervasi - Galvany",
+    Nom_barri == "Sant Gervasi- la Bonanova"  ~ "Sant Gervasi - la Bonanova",
+    .default = Nom_barri
+  ))
+
+df_hut_densitat <- df_hut |>
+  left_join(
+    df_habitatges_barri |> select(Any, Nom_barri, total_habitatges),
+    by = c("Any", "Nom_Barri" = "Nom_barri")
+  ) |>
+  mutate(
+    total_habitatges = replace_na(total_habitatges, 0),
+    pct_hut = if_else(total_habitatges > 0,
+                      n_llicencies / total_habitatges * 100,
+                      NA_real_)
+  )
 
 df_hut_densitat |>
-    filter(Any == max(Any)) |>
-    left_join(df_habitatges_barri, by = c("Any", "Nom_Barri" = "Nom_barri")) |>
-    mutate(pct_hut_habitatge = n_llicencies / total_habitatges * 100) |>
-    arrange(desc(pct_hut_habitatge)) |>
-    select(Nom_Barri, n_llicencies, total_habitatges, pct_hut_habitatge) |>
-    print(n = Inf)
+  filter(Any == max(Any)) |>
+  mutate(pct_hut_habitatge = n_llicencies / total_habitatges * 100) |>
+  arrange(desc(pct_hut_habitatge)) |>
+  select(Nom_Barri, n_llicencies, total_habitatges, pct_hut_habitatge) |>
+  print(n = Inf)
 
 ```
 
@@ -1077,28 +1113,24 @@ top5_hut <- df_hut_densitat |>
   pull(Nom_Barri)
 
   df_hut_densitat |>
-    filter(Nom_Barri %in% top5_hut) |>
-    left_join(df_habitatges_barri, by = c("Any", "Nom_Barri" = "Nom_barri")) |>
-    mutate(pct_hut_habitatge = n_llicencies / total_habitatges * 100) |>
     inner_join(df_lloguers, by = c("Any", "Nom_Barri")) |>
-    group_by(Nom_Barri) |>
-    mutate(
-      idx_hut     = pct_hut_habitatge / pct_hut_habitatge[Any == min(Any)] * 100,
-      idx_lloguer = preu_m2 / preu_m2[Any == min(Any)] * 100
+    group_by(Any) |>
+    summarise(
+      pct_hut_mitja  = mean(pct_hut, na.rm = TRUE),
+      preu_m2_mitja  = mean(preu_m2, na.rm = TRUE)
     ) |>
-    ungroup() |>
+    mutate(
+      idx_hut     = pct_hut_mitja  / pct_hut_mitja[Any  == min(Any)] * 100,
+      idx_lloguer = preu_m2_mitja / preu_m2_mitja[Any == min(Any)] * 100
+    ) |>
     pivot_longer(cols = c(idx_hut, idx_lloguer),
                  names_to = "indicador", values_to = "index") |>
-    mutate(indicador = case_when(
-      indicador == "idx_hut"     ~ "HUTs",
-      indicador == "idx_lloguer" ~ "Preu lloguer"
-    )) |>
+    mutate(indicador = if_else(indicador == "idx_hut", "Densitat HUT", "Preu lloguer")) |>
     ggplot(aes(x = Any, y = index, color = indicador)) +
-    geom_line(linewidth = 1) + geom_point() +
-    facet_wrap(~ Nom_Barri, ncol = 2) +
+    geom_line(linewidth = 1.2) + geom_point() +
     scale_y_continuous(labels = scales::percent_format(scale = 1)) +
-    labs(title = "Evolució d'HUTs i preu de lloguer (top 5 barris)",
-         x = "Any", y = "Índex (base = primer any)", color = NULL) +
+    labs(title = "Evolució de la densitat HUT i el preu de lloguer a Barcelona",
+         x = "Any", y = "Índex (base = 2018)", color = NULL) +
     theme(legend.position = "top")
 ```
 ```{r}
@@ -1117,7 +1149,6 @@ top5_hut <- df_hut_densitat |>
     left_join(
       df_hut_densitat |>
         filter(Any == 2025) |>
-        left_join(df_habitatges_barri, by = c("Nom_Barri" = "Nom_barri")) |>
         mutate(pct_hut_habitatge = n_llicencies / total_habitatges * 100),
       by = c("nom_barri" = "Nom_Barri")
     ) |>
@@ -1303,13 +1334,6 @@ df_propietari_barri |>
 ```
 El patró és semblant al que hem vist amb els HUT però ampliant també a les zones de rendes altes.
 
-```{r}
-df_propietari_barri |>
-  filter(Nom_Barri == "la Marina del Prat Vermell") |>
-  select(Any, total_habitatges, n_juridica, pct_juridica) |>
-  arrange(Any)
-```
-Hem notat que en el barri "la Marina del Prat Vermell" tenim una inconsistència en el nombre de propietaris jurídics. Entre l'any 2021 i 2022 veiem un salt anòmal i considerem que és degut a algun error en la classificació en la font de dades.
 
 # Taula cens comercial
 ```{r}
@@ -1623,38 +1647,28 @@ df_edu <- df_edu |>
 
 
 ```{r}
- any_min <- min(df_edu$Any)
-  any_max <- max(df_edu$Any)
+any_min <- min(df_edu$Any)
+any_max <- max(df_edu$Any)
 
-  df_edu |>
-    filter(Any %in% c(any_min, any_max)) |>
-    select(Any, Nom_Barri, Nom_Districte, pct_edu_alta) |>
-    pivot_wider(names_from = Any, values_from = pct_edu_alta,
-                names_prefix = "pct_") |>
-    mutate(increment = .data[[paste0("pct_", any_max)]] -
-                       .data[[paste0("pct_", any_min)]]) |>
-    slice_max(increment, n = 15) |>
-    ggplot(aes(x = increment, y = reorder(Nom_Barri, increment), fill = Nom_Districte)) +
-    geom_col() +
-    scale_x_continuous(labels = scales::percent) +
-    labs(
-      title = paste0("Barris amb major creixement d'educació alta (", any_min, "–", any_max, ")"),
-      x     = "Increment en punts percentuals",
-      y     = NULL,
-      fill  = NULL
-    ) +
-    theme_minimal() +
-    theme(legend.position = "bottom")
-```
-```{r}
- df_edu |>
-    filter(Any %in% c(any_min, any_max)) |>
-    select(Any, Nom_Barri, Nom_Districte, pct_edu_alta) |>
-    pivot_wider(names_from = Any, values_from = pct_edu_alta,
-                names_prefix = "pct_") |>
-    mutate(increment = .data[[paste0("pct_", any_max)]] -
-                       .data[[paste0("pct_", any_min)]]) |>
-    slice_max(increment, n = 15)
+df_edu |>
+filter(Any %in% c(any_min, any_max)) |>
+select(Any, Nom_Barri, Nom_Districte, pct_edu_alta) |>
+pivot_wider(names_from = Any, values_from = pct_edu_alta,
+            names_prefix = "pct_") |>
+mutate(increment = .data[[paste0("pct_", any_max)]] -
+                   .data[[paste0("pct_", any_min)]]) |>
+slice_max(increment, n = 15) |>
+ggplot(aes(x = increment, y = reorder(Nom_Barri, increment), fill = Nom_Districte)) +
+geom_col() +
+scale_x_continuous(labels = scales::percent) +
+labs(
+  title = paste0("Barris amb major creixement d'educació alta (", any_min, "–", any_max, ")"),
+  x     = "Increment en punts percentuals",
+  y     = NULL,
+  fill  = NULL
+) +
+theme_minimal() +
+theme(legend.position = "bottom")
 ```
 
 ### Nivell educatiu dominant per barri
@@ -1804,8 +1818,7 @@ diff_juridic <- df_propietari_barri |>
   select(Any, Nom_Barri, pct_juridica) |>
   pivot_wider(names_from = Any, values_from = pct_juridica, names_prefix = "juridic_") |>
   mutate(
-    diff_juridic = (juridic_2024 - juridic_2018) / 6,
-    diff_juridic = if_else(Nom_Barri == "la Marina del Prat Vermell", NA_real_, diff_juridic)
+    diff_juridic = (juridic_2024 - juridic_2018) / 6
   ) |>
   select(Nom_Barri, diff_juridic)
 
@@ -1830,20 +1843,8 @@ df_diff <- diff_renda |>
 
 
 df_diff <- df_diff |>
- mutate(diff_juridic = replace_na(diff_juridic, mean(diff_juridic, na.rm = TRUE))) |>
+ #mutate(diff_juridic = replace_na(diff_juridic, mean(diff_juridic, na.rm = TRUE))) |>
  mutate(diff_hut = replace_na(diff_hut, 0))
-
-# Winsoritza sobre dades brutes (abans d'escalar)
-winsorize <- function(x, p = 0.05) {
-  q <- quantile(x, c(p, 1 - p), na.rm = TRUE)
-  pmin(pmax(x, q[1]), q[2])
-}
-
-df_diff_wins <- df_diff |>
-  mutate(across(where(is.numeric), winsorize))
-
-df_indicadors <- df_diff_wins |> column_to_rownames("Nom_Barri") |> scale()
-
 ```
 
 ## Outliers
@@ -1851,13 +1852,17 @@ df_indicadors <- df_diff_wins |> column_to_rownames("Nom_Barri") |> scale()
 Tractem els outliers extrems amb windsorize
 
 ```{r}
-# Winsoritza cada variable al percentil 5–95 per eliminar outliers extrems
-winsorize <- function(x, p = 0.05) {
+#Outliers amd windsorize
+winsorize <- function(x, p) {
   q <- quantile(x, c(p, 1 - p), na.rm = TRUE)
   pmin(pmax(x, q[1]), q[2])
 }
 
-# winsorize ja aplicat al chunk anterior sobre dades brutes
+df_diff_wins <- df_diff |>
+  mutate(across(-c(Nom_Barri, diff_hut), \(x) winsorize(x, p = 0.05)),
+    diff_hut = winsorize(diff_hut, p = 0.10))
+
+df_indicadors <- df_diff_wins |> column_to_rownames("Nom_Barri") |> scale()
 ```
 
 ```{r}
@@ -1875,6 +1880,7 @@ as.data.frame(df_indicadors) |>
   labs(title = "Distribució dels indicadors de canvi per barri",
        x = NULL, y = "Taxa de canvi anual")
 ```
+
 
 ## Matriu de correlació
 ```{r}
@@ -1894,11 +1900,7 @@ ggcorrplot(
 
 
 ```{r}
-#renda_base <- df_renda_barri |>
-#  filter(Any == 2015) |>
-#  select(Nom_Barri, renda_base = renda_mitjana)  
-
-df_model <- df_indicadors  # ja winsoritzat i escalat
+df_model <- df_indicadors
 ```
 
 #PCA
@@ -1912,9 +1914,6 @@ fviz_eig(pca, addlabels = TRUE,
          main = "Vàriancia explicada per cada PCA")
 ```
 
-```{r}
-  moran.test(barris_sf$PC1, lw, zero.policy = TRUE)
-```
 
 ```{r}
 fviz_pca_var(pca,
@@ -1939,10 +1938,11 @@ pca$rotation[, 1] |>
 
 
 ```{r}
-#df_pca_scores <- as.data.frame(pca$x[, 1:4])
+df_pca_scores <- as.data.frame(pca$x[, 1:4])
 
 fviz_nbclust(df_model, kmeans, method = "silhouette")
 ```
+
 
 ```{r}
 set.seed(42)
@@ -1959,33 +1959,23 @@ fviz_cluster(km, data = df_model,
              ggtheme = theme_minimal(),
              main = "Clustering de barris de Barcelona")
 ```
-```{r}
-  clusters_barri |>
-    group_by(cluster) |>
-    summarise(n = n(), .groups = "drop")
-```
+
 
 ```{r}
-  clusters_barri |>
-    arrange(cluster) |>
-    print(n = Inf)
-```
-
-```{r}
-  df_diff |>
-    inner_join(clusters_barri, by = "Nom_Barri") |>
-    filter(cluster == 3) |>
-    select(Nom_Barri, diff_renda, diff_edu, diff_lloguer, diff_hut) |>
-    arrange(diff_renda)
+df_diff |>
+  inner_join(clusters_barri, by = "Nom_Barri") |>
+  filter(cluster == 3) |>
+  select(Nom_Barri, diff_renda, diff_edu, diff_lloguer, diff_hut) |>
+  arrange(diff_renda)
 ```
 
 
 ```{r}
  etiquetes_cluster <- c(
-    "1" = "Perifèric",
-    "2" = "Acomodat",
-    "3" = "Gentrificat",
-    "4" = "Transició"
+    "1" = "Gentrificat",
+    "2" = "Perifèric",
+    "3" = "Transició",
+    "4" = "Acomodat"
   )
 
   barris_geo |>
@@ -2005,13 +1995,10 @@ fviz_cluster(km, data = df_model,
 
 #Contagi entre clusters
 ```{r}
-library(spdep)
+
 
 # PC1 com a score de gentrificació
-df_scores <- tibble(
-  Nom_Barri = rownames(df_model),
-  PC1 = pca$x[, 1]
-)
+df_scores <- data.frame(Nom_Barri = rownames(df_model), PC1 = pca$x[, 1])
 
 barris_sf <- barris_geo |>
   left_join(df_scores, by = c("nom_barri" = "Nom_Barri"))
@@ -2031,7 +2018,7 @@ moran.plot(
   zero.policy = TRUE,
   xlab = "Score de gentrificació (PC1)",
   ylab = "Mitjana dels veïns",
-  main = "Diagrama de Moran — Contagi de la gentrificació"
+  main = "Diagrama de Moran - Contagi de la gentrificació"
 )
 ```
 
@@ -2055,107 +2042,139 @@ df_canvi_bcn <- df_origen_simple_barri |>
 ```{r}
   # clusters_barri ja definit al chunk del kmeans
 
-  df_flux |>
-    inner_join(clusters_barri, by = c("Nom_Barri_Origen" = "Nom_Barri")) |>
-    rename(cluster_origen = cluster) |>
-    inner_join(clusters_barri, by = c("Nom_Barri_Dest" = "Nom_Barri")) |>
-    rename(cluster_dest = cluster) |>
-    group_by(cluster_origen, cluster_dest) |>
-    summarise(total = sum(Valor, na.rm = TRUE), .groups = "drop") |>
-    ggplot(aes(x = cluster_origen, y = cluster_dest, fill = total)) +
-    geom_tile(color = "white") +
-    geom_text(aes(label = scales::comma(total)), size = 3) +
-    scale_fill_viridis_c(option = "magma", direction = -1, labels = scales::comma) +
-    labs(
-      title = "Fluxos de moviment entre clusters",
-      x = "Cluster origen", y = "Cluster destinació",
-      fill = "Persones"
-    ) +
-    theme_minimal()
-```
-```{r}
-  df_flux |>
-    inner_join(clusters_barri, by = c("Nom_Barri_Origen" = "Nom_Barri")) |>
-    rename(cluster_origen = cluster) |>
-    inner_join(clusters_barri, by = c("Nom_Barri_Dest" = "Nom_Barri")) |>
-    rename(cluster_dest = cluster) |>
-    group_by(cluster_origen, cluster_dest) |>
-    summarise(total = sum(Valor, na.rm = TRUE), .groups = "drop") |>
-    mutate(
-      cluster_origen = recode(as.character(cluster_origen),
-        "1" = "Perifèric", "2" = "Acomodat",
-        "3" = "Gentrificat", "4" = "En transició"),
-      cluster_dest = recode(as.character(cluster_dest),
-        "1" = "Perifèric", "2" = "Acomodat",
-        "3" = "Gentrificat", "4" = "En transició")
-    ) |>
-    arrange(cluster_origen, cluster_dest) |>
-    print(n = Inf)
+df_flux |>
+  inner_join(clusters_barri, by = c("Nom_Barri_Origen" = "Nom_Barri")) |>
+  rename(cluster_origen = cluster) |>
+  inner_join(clusters_barri, by = c("Nom_Barri_Dest" = "Nom_Barri")) |>
+  rename(cluster_dest = cluster) |>
+  group_by(cluster_origen, cluster_dest) |>
+  summarise(total = sum(Valor, na.rm = TRUE), .groups = "drop") |>
+  ggplot(aes(x = cluster_origen, y = cluster_dest, fill = total)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = scales::comma(total)), size = 3) +
+  scale_fill_viridis_c(option = "magma", direction = -1, labels = scales::comma) +
+  labs(
+    title = "Fluxos de moviment entre clusters",
+    x = "Cluster origen", y = "Cluster destinació",
+    fill = "Persones"
+  ) +
+  theme_minimal()
 ```
 
 ```{r}
- library(networkD3)
+flux_clusters <- df_flux |>
+  inner_join(clusters_barri, by = c("Nom_Barri_Origen" = "Nom_Barri")) |>
+  rename(cluster_origen = cluster) |>
+  inner_join(clusters_barri, by = c("Nom_Barri_Dest" = "Nom_Barri")) |>
+  rename(cluster_dest = cluster) |>
+  group_by(cluster_origen, cluster_dest) |>
+  summarise(total = sum(Valor, na.rm = TRUE), .groups = "drop")
 
-  flux_clusters <- df_flux |>
-    inner_join(clusters_barri, by = c("Nom_Barri_Origen" = "Nom_Barri")) |>
-    rename(cluster_origen = cluster) |>
-    inner_join(clusters_barri, by = c("Nom_Barri_Dest" = "Nom_Barri")) |>
-    rename(cluster_dest = cluster) |>
-    group_by(cluster_origen, cluster_dest) |>
-    summarise(total = sum(Valor, na.rm = TRUE), .groups = "drop")
+nodes <- data.frame(name = c(
+  "Gentrificat (origen)", "Perifèric (origen)", "Transició (origen)", "Acomodat (origen)",
+  "Gentrificat (dest)",   "Perifèric (dest)",   "Transició (dest)",   "Acomodat (dest)"
+))
 
-  nodes <- data.frame(name = c(
-    "Perifèric (origen)", "Acomodat (origen)", "Gentrificat (origen)", "En transició (origen)",
-    "Perifèric (dest)",   "Acomodat (dest)",   "Gentrificat (dest)",   "En transició (dest)"
-  ))
+links <- flux_clusters |>
+  mutate(
+    source = as.integer(cluster_origen) - 1,
+    target = as.integer(cluster_dest) - 1 + 4
+  ) |>
+  select(source, target, value = total) |>
+  as.data.frame()
 
-  links <- flux_clusters |>
-    mutate(
-      source = as.integer(cluster_origen) - 1,
-      target = as.integer(cluster_dest) - 1 + 4
-    ) |>
-    select(source, target, value = total) |>
-    as.data.frame()
-
-  sankeyNetwork(
-    Links      = links,
-    Nodes      = nodes,
-    Source     = "source",
-    Target     = "target",
-    Value      = "value",
-    NodeID     = "name",
-    fontSize   = 14,
-    nodeWidth  = 30,
-    sinksRight = FALSE
-  )
+sankeyNetwork(
+  Links      = links,
+  Nodes      = nodes,
+  Source     = "source",
+  Target     = "target",
+  Value      = "value",
+  NodeID     = "name",
+  fontSize   = 14,
+  nodeWidth  = 30,
+  sinksRight = FALSE
+)
 ```
 
 
 
-#Export per shiny
+
+
+```{r}
+# Export de taules utilitzades
+
+write_csv(df_renda_barri, "../repositori/dades/net/renda_barri.csv")
+write_csv(df_padro, "../repositori/dades/net/padro_barri.csv")
+write_csv(df_origen_simple_barri, "../repositori/dades/net/origen_simple_barri.csv")
+write_csv(df_lloc_naix,           "../repositori/dades/net/lloc_naix_regio_barri.csv")
+write_csv(df_regio_rica, "../repositori/dades/net/regio_rica_barri.csv")
+write_csv(df_lloguers,            "../repositori/dades/net/preus_lloguer_barri.csv")
+write_csv(df_hut,                 "../repositori/dades/net/pisos_turistics_barri.csv")
+write_csv(df_hut_densitat,        "../repositori/dades/net/hut_densitat_barri.csv")
+write_csv(df_habitatges_barri, "../repositori/dades/net/habitatges_barri.csv")
+write_csv(df_propietari_barri, "../repositori/dades/net/propietari_barri.csv")
+write_csv(df_cens_barri,          "../repositori/dades/net/cens_comercial_barri.csv")
+write_csv(df_edu, "../repositori/dades/net/edu_barri.csv")
+write_csv(df_diff, "../repositori/dades/net/indicadors_diff.csv")
+write_csv(clusters_barri, "../repositori/dades/net/clusters_barri.csv")
+```
+
+
+```{r}
+df_deployment <- df_lloc_naix_simple |>
+  filter(LLOC_NAIX == 1) |>
+  group_by(Any, Codi_Districte, Nom_Districte, Codi_Barri, Nom_Barri) |>
+  summarise(barcelonins = sum(Valor, na.rm = TRUE), .groups = "drop") |>
+  left_join(
+    df_lloc_naix_simple |>
+      group_by(Any, Codi_Barri, Nom_Barri) |>
+      summarise(total = sum(Valor, na.rm = TRUE), .groups = "drop"),
+    by = c("Any", "Codi_Barri", "Nom_Barri")
+  ) |>
+  mutate(pct = barcelonins / total) |>
+  left_join(
+    df_lloc_naix_simple |>
+      filter(Any == 2015, LLOC_NAIX == 1) |>
+      group_by(Codi_Barri) |>
+      summarise(bcn_2015 = sum(Valor, na.rm = TRUE), .groups = "drop"),
+    by = "Codi_Barri"
+  ) |>
+  left_join(
+    df_lloc_naix_simple |>
+      filter(Any == 2015) |>
+      group_by(Codi_Barri) |>
+      summarise(total_2015 = sum(Valor, na.rm = TRUE), .groups = "drop"),
+    by = "Codi_Barri"
+  ) |>
+  mutate(
+    pct_2015      = bcn_2015 / total_2015,
+    canvi_absolut = barcelonins - bcn_2015,
+    canvi_relatiu = (pct - pct_2015) / pct_2015
+  ) |>
+  filter(Any >= 2016) |>
+  select(Any, Nom_Barri, Nom_Districte, canvi_absolut, canvi_relatiu)
+```
+
 
 ```{r exportacio_shiny}
-  df_clusters_export <- df_diff |>
-    inner_join(clusters_barri, by = "Nom_Barri")
-
-  df_temporal_export <- df_lloguers |>
-    select(Any, Nom_Barri, preu_m2) |>
-    left_join(df_renda_barri      |> select(Any, Nom_Barri, renda_mitjana),    by = c("Any", "Nom_Barri")) |>
-    left_join(df_padro            |> select(Any, Nom_Barri, pct_joves_adults), by = c("Any", "Nom_Barri")) |>
-    left_join(df_origen_simple_barri |> select(Any, Nom_Barri, pct_barcelona), by = c("Any", "Nom_Barri")) |>
-    left_join(df_hut_densitat     |> select(Any, Nom_Barri, pct_hut) |> mutate(pct_hut = pct_hut / 100), by = c("Any",
-  "Nom_Barri")) |>
-    left_join(df_regio_rica       |> select(Any, Nom_Barri, pct_regio_rica),   by = c("Any", "Nom_Barri")) |>
-    left_join(df_propietari_barri |> select(Any, Nom_Barri, pct_juridica),     by = c("Any", "Nom_Barri")) |>
-    left_join(df_edu              |> select(Any, Nom_Barri, pct_edu_alta),     by = c("Any", "Nom_Barri")) |>
-  left_join(df_canvi_bcn, by = c("Any", "Nom_Barri")
-  ) |>
+df_temporal_export <- df_lloguers |>
+    select(Any, Nom_Barri, preu_m2) |> left_join(df_renda_barri |> select(Any, Nom_Barri, renda_mitjana), by = c("Any", "Nom_Barri")) |>
+    left_join(df_padro |> select(Any, Nom_Barri, pct_joves_adults), by = c("Any", "Nom_Barri")) |>
+    left_join(df_origen_simple_barri |> select(Any, Nom_Barri, pct_barcelona), by = c("Any", "Nom_Barri")) |> 
+    left_join(df_hut_densitat |> select(Any, Nom_Barri, pct_hut) |> mutate(pct_hut = pct_hut / 100), by = c("Any", "Nom_Barri")) |> 
+    left_join(df_regio_rica |> select(Any, Nom_Barri, pct_regio_rica), by = c("Any", "Nom_Barri")) |>
+    left_join(df_propietari_barri |> select(Any, Nom_Barri, pct_juridica), by = c("Any", "Nom_Barri")) |>
+    left_join(df_edu |> select(Any, Nom_Barri, pct_edu_alta), by = c("Any", "Nom_Barri")) |>
+    left_join(df_canvi_bcn, by = c("Any", "Nom_Barri")) |>
     mutate(pct_hut = replace_na(pct_hut, 0))
 
-  saveRDS(df_clusters_export,                   "shiny/df_clusters.rds")
-  saveRDS(df_temporal_export,                   "shiny/df_temporal.rds")
-  saveRDS(df_padro,                             "shiny/df_padro_barri.rds")
-  sf::st_write(barris_geo |> sf::st_transform(4326), "shiny/barris_geo.geojson", delete_dsn = TRUE)
+  saveRDS(clusters_barri, "../repositori/dades/net/df_clusters.rds")
+  saveRDS(df_temporal_export, "../repositori/dades/net/df_temporal.rds")
+  saveRDS(df_padro, "../repositori/dades/net/df_padro_barri.rds")
+  saveRDS(df_renda_barri, "../repositori/dades/net/df_renda_barri.rds")
+  saveRDS(df_deployment, "../repositori/dades/net/df_deployment.rds")
+  sf::st_write(barris_geo |> sf::st_transform(4326), "../repositori/dades/net/barris_geo.geojson", delete_dsn = TRUE)
+
 ```
 
 

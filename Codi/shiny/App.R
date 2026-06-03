@@ -8,27 +8,26 @@ library(ggplot2)
 library(tidyr)
 library(scales)
 
-df_renda_barri  <- readRDS("../dades/net/df_renda_barri.rds")
-df_padro_barri  <- readRDS("../dades/net/df_padro_barri.rds")
-df_desplagament <- readRDS("../dades/net/df_desplagament.rds")
-df_clusters     <- readRDS("../dades/net/df_clusters.rds")
-df_temporal     <- readRDS("../dades/net/df_temporal.rds")
-barris_geo_list <- jsonlite::read_json("../dades/net/barris_geo.geojson")
-
-extract_coords <- function(feature) {
-  coords <- feature$geometry$coordinates
-  nom    <- feature$properties$nom_barri
-  ring   <- if (feature$geometry$type == "Polygon") coords[[1]] else coords[[1]][[1]]
-  data.frame(
-    lon       = vapply(ring, `[[`, numeric(1), 1),
-    lat       = vapply(ring, `[[`, numeric(1), 2),
-    nom_barri = nom,
-    stringsAsFactors = FALSE
-  )
+if (file.exists("df_temporal.rds")) {
+  dades_dir       <- "."
+  deployment_file <- "df_desplagament.rds"
+} else {
+  dades_dir       <- "../../repositori/dades/net"
+  deployment_file <- "df_deployment.rds"
 }
-barris_poly <- bind_rows(lapply(barris_geo_list$features, extract_coords))
 
-lat_ratio <- 1 / cos(41.4 * pi / 180)
+df_renda_barri  <- readRDS(file.path(dades_dir, "df_renda_barri.rds"))
+df_padro_barri  <- readRDS(file.path(dades_dir, "df_padro_barri.rds"))
+df_deployment   <- readRDS(file.path(dades_dir, deployment_file))
+df_clusters     <- readRDS(file.path(dades_dir, "df_clusters.rds"))
+df_temporal     <- readRDS(file.path(dades_dir, "df_temporal.rds"))
+barris_geo_list <- jsonlite::read_json(file.path(dades_dir, "barris_geo.geojson"))
+
+df_temporal <- df_temporal |>
+  left_join(
+    df_deployment |> select(Any, Nom_Barri, canvi_absolut),
+    by = c("Any", "Nom_Barri")
+  )
 
 year_ranges <- df_temporal |>
   pivot_longer(cols = -c(Any, Nom_Barri), names_to = "var", values_to = "val") |>
@@ -37,14 +36,15 @@ year_ranges <- df_temporal |>
   summarise(min_any = min(Any), max_any = max(Any), .groups = "drop")
 
 variables <- c(
-  "Preu lloguer (€/m²)"      = "preu_m2",
-  "Renda mitjana (€)"        = "renda_mitjana",
-  "% Barcelonins"            = "pct_barcelona",
-  "% Pisos turístics"        = "pct_hut",
-  "% Estrangers reg. riques" = "pct_regio_rica",
-  "% Propietaris jurídics"   = "pct_juridica",
-  "% Educació superior"      = "pct_edu_alta",
-  "Pèrdua de barcelonins"    = "canvi_bcn"
+  "Preu lloguer (€/m²)"               = "preu_m2",
+  "Renda mitjana (€)"                  = "renda_mitjana",
+  "% Barcelonins"                      = "pct_barcelona",
+  "% Pisos turístics"                  = "pct_hut",
+  "% Estrangers regions rendes altes"  = "pct_regio_rica",
+  "% Propietaris jurídics"             = "pct_juridica",
+  "% Educació superior"                = "pct_edu_alta",
+  "Pèrdua de barcelonins (absolut)"    = "canvi_absolut",
+  "Pèrdua de barcelonins (%)"          = "canvi_bcn"
 )
 
 indicadors_choices <- c(
@@ -59,9 +59,29 @@ indicadors_choices <- c(
   "Pèrdua de barcelonins"              = "canvi_bcn"
 )
 
-cluster_labels <- c("1" = "Perifèric", "2" = "Acomodat", "3" = "Gentrificat", "4" = "Transició")
+indicadors_perfil <- c(
+  "Preu lloguer (€/m²)"               = "preu_m2",
+  "Renda mitjana (€)"                  = "renda_mitjana",
+  "% Barcelonins"                      = "pct_barcelona",
+  "% Joves adults (25-39)"             = "pct_joves_adults",
+  "% Pisos turístics"                  = "pct_hut",
+  "% Estrangers regions rendes altes"  = "pct_regio_rica",
+  "% Propietaris jurídics"             = "pct_juridica",
+  "% Educació superior"                = "pct_edu_alta"
+)
+
+cluster_labels <- c("1" = "Gentrificat", "2" = "Perifèric", "3" = "Transició", "4" = "Acomodat")
 cluster_colors <- c("1" = "#66C2A5",   "2" = "#FC8D62",  "3" = "#8DA0CB",     "4" = "#E78AC3")
 cl_df <- df_clusters |> mutate(cluster = as.character(cluster))
+
+# Step colorscale per als 4 clusters (valors 1–4, normalitzats a [0,1])
+# Transicions a 1.5→0.167, 2.5→0.5, 3.5→0.833
+cluster_cs <- list(
+  list(0,     "#66C2A5"), list(0.167, "#66C2A5"),
+  list(0.167, "#FC8D62"), list(0.5,   "#FC8D62"),
+  list(0.5,   "#8DA0CB"), list(0.833, "#8DA0CB"),
+  list(0.833, "#E78AC3"), list(1,     "#E78AC3")
+)
 
 ui <- navbarPage(
   title = "Gentrificació a Barcelona",
@@ -113,6 +133,20 @@ ui <- navbarPage(
     )
   ),
 
+  tabPanel("Perfil de barri",
+    sidebarLayout(
+      sidebarPanel(width = 3,
+        selectInput("barri_perfil", "Barri:",
+                    choices  = sort(unique(df_temporal$Nom_Barri)),
+                    selected = "la Dreta de l'Eixample"),
+        checkboxGroupInput("vars_perfil", "Variables:",
+                           choices  = indicadors_perfil,
+                           selected = c("preu_m2", "renda_mitjana", "pct_barcelona", "pct_regio_rica"))
+      ),
+      mainPanel(width = 9, plotOutput("grafic_perfil", height = "500px"))
+    )
+  ),
+
   tabPanel("Perfil de clusters",
     sidebarLayout(
       sidebarPanel(width = 3,
@@ -143,34 +177,39 @@ server <- function(input, output, session) {
     fmt <- switch(var,
       renda_mitjana = function(x) paste0(round(x), " €"),
       preu_m2       = function(x) paste0(round(x, 1), " €/m²"),
+      canvi_absolut = function(x) paste0(round(x), " persones"),
       function(x) paste0(round(x * 100, 1), "%")
     )
 
     dades <- df_temporal |>
-      filter(Any == input$any) |>
+      filter(Any == input$any, !is.na(.data[[var]])) |>
       select(Nom_Barri, valor = all_of(var))
 
-    poly_data <- barris_poly |>
-      left_join(dades, by = c("nom_barri" = "Nom_Barri")) |>
-      mutate(tooltip = if_else(
-        is.na(valor), nom_barri,
-        paste0(nom_barri, ": ", fmt(valor))
-      ))
-
-    p <- ggplot(poly_data,
-                aes(x = lon, y = lat, group = nom_barri, fill = valor, text = tooltip)) +
-      geom_polygon(color = "white", linewidth = 0.3) +
-      coord_fixed(ratio = lat_ratio) +
-      scale_fill_distiller(palette = "YlOrRd", direction = 1,
-                           name = var_lbl, na.value = "grey80") +
-      theme_void()
-
-    ggplotly(p, tooltip = "text") |>
-      layout(xaxis = list(visible = FALSE), yaxis = list(visible = FALSE))
+    plot_ly(
+      type         = "choroplethmapbox",
+      geojson      = barris_geo_list,
+      locations    = dades$Nom_Barri,
+      z            = dades$valor,
+      featureidkey = "properties.nom_barri",
+      colorscale   = "YlOrRd",
+      reversescale = !(var %in% c("canvi_absolut", "canvi_bcn")),
+      marker       = list(opacity = 0.65, line = list(width = 0.8, color = "white")),
+      text         = paste0(dades$Nom_Barri, "<br>", var_lbl, ": ", fmt(dades$valor)),
+      hovertemplate = "%{text}<extra></extra>",
+      colorbar     = list(title = var_lbl)
+    ) |>
+      layout(
+        mapbox = list(
+          style  = "open-street-map",
+          center = list(lon = 2.1734, lat = 41.3851),
+          zoom   = 11
+        ),
+        margin = list(l = 0, r = 0, t = 0, b = 0)
+      )
   })
 
   output$scatter <- renderPlot({
-    df_desplagament |>
+    df_deployment |>
       filter(Any == input$any_scatter) |>
       ggplot(aes(x = canvi_absolut, y = canvi_relatiu,
                  label = Nom_Barri, color = Nom_Districte)) +
@@ -188,33 +227,46 @@ server <- function(input, output, session) {
   })
 
   output$mapa_clusters <- renderPlotly({
-    color_map <- setNames(unname(cluster_colors), unname(cluster_labels))
-
-    poly_data <- barris_poly |>
-      left_join(cl_df |> select(nom_barri = Nom_Barri, cluster), by = "nom_barri") |>
+    cl_plot <- cl_df |>
       mutate(
-        cluster_lbl = cluster_labels[cluster],
-        tooltip     = paste0(nom_barri, " — ", cluster_labels[cluster]),
-        key         = nom_barri
+        cluster_num = as.numeric(cluster),
+        tooltip     = paste0(Nom_Barri, "<br>", cluster_labels[cluster])
       )
 
-    p <- ggplot(poly_data,
-                aes(x = lon, y = lat, group = nom_barri,
-                    fill = cluster_lbl, text = tooltip, key = key)) +
-      geom_polygon(color = "white", linewidth = 0.3) +
-      coord_fixed(ratio = lat_ratio) +
-      scale_fill_manual(values = color_map, name = "Clúster", na.value = "grey80") +
-      theme_void()
-
-    ggplotly(p, tooltip = "text", source = "cluster_map") |>
-      layout(xaxis = list(visible = FALSE), yaxis = list(visible = FALSE)) |>
+    plot_ly(
+      type         = "choroplethmapbox",
+      geojson      = barris_geo_list,
+      locations    = cl_plot$Nom_Barri,
+      z            = cl_plot$cluster_num,
+      featureidkey = "properties.nom_barri",
+      colorscale   = cluster_cs,
+      marker       = list(opacity = 0.65, line = list(width = 0.8, color = "white")),
+      customdata    = cl_plot$Nom_Barri,
+      text         = cl_plot$tooltip,
+      hovertemplate = "%{text}<extra></extra>",
+      colorbar     = list(
+        title    = "Clúster",
+        tickvals = c(1, 2, 3, 4),
+        ticktext = c("Gentrificat", "Perifèric", "Transició", "Acomodat")
+      ),
+      source       = "cluster_map"
+    ) |>
+      layout(
+        mapbox = list(
+          style  = "open-street-map",
+          center = list(lon = 2.1734, lat = 41.3851),
+          zoom   = 11
+        ),
+        margin = list(l = 0, r = 0, t = 0, b = 0)
+      ) |>
       event_register("plotly_click")
   })
 
   barri_sel <- reactiveVal(NULL)
   observeEvent(event_data("plotly_click", source = "cluster_map"), {
     click <- event_data("plotly_click", source = "cluster_map")
-    if (!is.null(click$key)) barri_sel(click$key)
+    nom <- if (!is.null(click$customdata)) click$customdata else click$location
+    if (!is.null(nom)) barri_sel(nom)
   })
 
   output$titol_barri <- renderText({
@@ -234,9 +286,9 @@ server <- function(input, output, session) {
       list(val = vals[[col]][1], any = vals$Any[1])
     }
 
-    fmt_eur   <- function(l) if (is.na(l$val)) "—" else paste0(round(l$val),      " € (", l$any, ")")
+    fmt_eur   <- function(l) if (is.na(l$val)) "—" else paste0(round(l$val),  " € (", l$any, ")")
     fmt_eurm2 <- function(l) if (is.na(l$val)) "—" else paste0(round(l$val, 1), " €/m² (", l$any, ")")
-    fmt_pct   <- function(l) if (is.na(l$val)) "—" else paste0(round(l$val * 100, 1), "% (", l$any, ")")
+    fmt_pct   <- function(l) if (is.na(l$val)) "—" else paste0(round(l$val * 100, 1),  "% (", l$any, ")")
 
     col <- cluster_colors[as.character(row_cl$cluster)]
 
@@ -273,6 +325,33 @@ server <- function(input, output, session) {
       geom_line(linewidth = 1.3) + geom_point(size = 2.5) +
       scale_color_manual(values = c("#E63946", "#457B9D")) +
       labs(title = paste("Evolució de", ind_lbl), x = "Any", y = ind_lbl, color = NULL) +
+      theme_minimal(base_size = 14) +
+      theme(legend.position = "top")
+  })
+
+  output$grafic_perfil <- renderPlot({
+    req(input$barri_perfil, length(input$vars_perfil) >= 1)
+
+    df_temporal |>
+      filter(Nom_Barri == input$barri_perfil) |>
+      select(Any, all_of(input$vars_perfil)) |>
+      pivot_longer(cols = -Any, names_to = "variable", values_to = "valor") |>
+      filter(!is.na(valor)) |>
+      group_by(variable) |>
+      arrange(Any) |>
+      mutate(index = (valor / first(valor) - 1) * 100) |>
+      ungroup() |>
+      mutate(variable = names(indicadors_perfil)[match(variable, indicadors_perfil)]) |>
+      ggplot(aes(x = Any, y = index, color = variable)) +
+      geom_hline(yintercept = 0, linetype = "dashed", color = "grey60") +
+      geom_line(linewidth = 1.2) +
+      geom_point(size = 2) +
+      scale_y_continuous(labels = scales::label_number(suffix = "%")) +
+      labs(
+        title    = paste("Evolució d'indicadors —", input$barri_perfil),
+        subtitle = "Variació (%) respecte la primera observació de cada variable",
+        x = "Any", y = "Variació (%)", color = NULL
+      ) +
       theme_minimal(base_size = 14) +
       theme(legend.position = "top")
   })

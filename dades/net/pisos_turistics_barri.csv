@@ -1,5 +1,5 @@
 Any,Nom_Districte,Nom_Barri,n_llicencies
-2018,CIUTAT VELLA,"Sant Pere, Santa Caterina i la Ribera",168
+2018,CIUTAT VELLA,Sant Pere Santa Caterina i la Ribera,168
 2018,CIUTAT VELLA,el Barri Gòtic,194
 2018,CIUTAT VELLA,el Raval,178
 2018,CIUTAT VELLA,la Barceloneta,66
@@ -60,10 +60,10 @@ Any,Nom_Districte,Nom_Barri,n_llicencies
 2018,SARRIA-SANT GERVASI,Sant Gervasi - Galvany,244
 2018,SARRIA-SANT GERVASI,Sant Gervasi - la Bonanova,32
 2018,SARRIA-SANT GERVASI,Sarrià,27
-2018,SARRIA-SANT GERVASI,"Vallvidrera, el Tibidabo i les Planes",3
+2018,SARRIA-SANT GERVASI,Vallvidrera el Tibidabo i les Planes,3
 2018,SARRIA-SANT GERVASI,el Putxet i el Farró,155
 2018,SARRIA-SANT GERVASI,les Tres Torres,35
-2019,CIUTAT VELLA,"Sant Pere, Santa Caterina i la Ribera",160
+2019,CIUTAT VELLA,Sant Pere Santa Caterina i la Ribera,160
 2019,CIUTAT VELLA,el Barri Gòtic,193
 2019,CIUTAT VELLA,el Raval,194
 2019,CIUTAT VELLA,la Barceloneta,60
@@ -124,10 +124,10 @@ Any,Nom_Districte,Nom_Barri,n_llicencies
 2019,SARRIA-SANT GERVASI,Sant Gervasi - Galvany,244
 2019,SARRIA-SANT GERVASI,Sant Gervasi - la Bonanova,32
 2019,SARRIA-SANT GERVASI,Sarrià,27
-2019,SARRIA-SANT GERVASI,"Vallvidrera, el Tibidabo i les Planes",3
+2019,SARRIA-SANT GERVASI,Vallvidrera el Tibidabo i les Planes,3
 2019,SARRIA-SANT GERVASI,el Putxet i el Farró,143
 2019,SARRIA-SANT GERVASI,les Tres Torres,35
-2020,CIUTAT VELLA,"Sant Pere, Santa Caterina i la Ribera",159
+2020,CIUTAT VELLA,Sant Pere Santa Caterina i la Ribera,159
 2020,CIUTAT VELLA,el Barri Gòtic,193
 2020,CIUTAT VELLA,el Raval,191
 2020,CIUTAT VELLA,la Barceloneta,64
@@ -188,10 +188,10 @@ Any,Nom_Districte,Nom_Barri,n_llicencies
 2020,SARRIA-SANT GERVASI,Sant Gervasi - Galvany,244
 2020,SARRIA-SANT GERVASI,Sant Gervasi - la Bonanova,32
 2020,SARRIA-SANT GERVASI,Sarrià,27
-2020,SARRIA-SANT GERVASI,"Vallvidrera, el Tibidabo i les Planes",3
+2020,SARRIA-SANT GERVASI,Vallvidrera el Tibidabo i les Planes,3
 2020,SARRIA-SANT GERVASI,el Putxet i el Farró,143
 2020,SARRIA-SANT GERVASI,les Tres Torres,35
-2021,CIUTAT VELLA,"Sant Pere, Santa Caterina i la Ribera",159
+2021,CIUTAT VELLA,Sant Pere Santa Caterina i la Ribera,159
 2021,CIUTAT VELLA,el Barri Gòtic,193
 2021,CIUTAT VELLA,el Raval,189
 2021,CIUTAT VELLA,la Barceloneta,64
@@ -252,10 +252,10 @@ Any,Nom_Districte,Nom_Barri,n_llicencies
 2021,SARRIA-SANT GERVASI,Sant Gervasi - Galvany,242
 2021,SARRIA-SANT GERVASI,Sant Gervasi - la Bonanova,32
 2021,SARRIA-SANT GERVASI,Sarrià,26
-2021,SARRIA-SANT GERVASI,"Vallvidrera, el Tibidabo i les Planes",3
+2021,SARRIA-SANT GERVASI,Vallvidrera el Tibidabo i les Planes,3
 2021,SARRIA-SANT GERVASI,el Putxet i el Farró,154
 2021,SARRIA-SANT GERVASI,les Tres Torres,35
-2022,CIUTAT VELLA,"Sant Pere, Santa Caterina i la Ribera",159
+2022,CIUTAT VELLA,Sant Pere Santa Caterina i la Ribera,159
 2022,CIUTAT VELLA,el Barri Gòtic,194
 2022,CIUTAT VELLA,el Raval,199
 2022,CIUTAT VELLA,la Barceloneta,64
@@ -316,7 +316,7 @@ Any,Nom_Districte,Nom_Barri,n_llicencies
 2022,SARRIA-SANT GERVASI,Sant Gervasi - Galvany,239
 2022,SARRIA-SANT GERVASI,Sant Gervasi - la Bonanova,36
 2022,SARRIA-SANT GERVASI,Sarrià,26
-2022,SARRIA-SANT GERVASI,"Vallvidrera, el Tibidabo i les Planes",3
+2022,SARRIA-SANT GERVASI,Vallvidrera el Tibidabo i les Planes,3
 2022,SARRIA-SANT GERVASI,el Putxet i el Farró,154
 2022,SARRIA-SANT GERVASI,les Tres Torres,33
 2023,CIUTAT VELLA,"Sant Pere, Santa Caterina i la Ribera",179
