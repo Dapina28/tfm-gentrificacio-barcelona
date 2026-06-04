@@ -8,13 +8,8 @@ library(ggplot2)
 library(tidyr)
 library(scales)
 
-if (file.exists("df_temporal.rds")) {
-  dades_dir       <- "."
-  deployment_file <- "df_desplagament.rds"
-} else {
-  dades_dir       <- "../../repositori/dades/net"
-  deployment_file <- "df_deployment.rds"
-}
+dades_dir       <- "../../repositori/dades/net"
+deployment_file <- "df_deployment.rds"
 
 df_renda_barri  <- readRDS(file.path(dades_dir, "df_renda_barri.rds"))
 df_padro_barri  <- readRDS(file.path(dades_dir, "df_padro_barri.rds"))
@@ -174,29 +169,36 @@ server <- function(input, output, session) {
     var     <- input$variable
     var_lbl <- names(variables)[variables == var]
 
+    pct_vars <- c("pct_barcelona", "pct_hut", "pct_regio_rica", "pct_juridica",
+                  "pct_edu_alta", "pct_joves_adults", "canvi_bcn")
+
     fmt <- switch(var,
       renda_mitjana = function(x) paste0(round(x), " €"),
       preu_m2       = function(x) paste0(round(x, 1), " €/m²"),
       canvi_absolut = function(x) paste0(round(x), " persones"),
-      function(x) paste0(round(x * 100, 1), "%")
+      function(x) paste0(round(x, 1), "%")
     )
 
     dades <- df_temporal |>
       filter(Any == input$any, !is.na(.data[[var]])) |>
-      select(Nom_Barri, valor = all_of(var))
+      select(Nom_Barri, valor = all_of(var)) |>
+      mutate(valor_z = if (var %in% pct_vars) valor * 100 else valor)
 
     plot_ly(
       type         = "choroplethmapbox",
       geojson      = barris_geo_list,
       locations    = dades$Nom_Barri,
-      z            = dades$valor,
+      z            = dades$valor_z,
       featureidkey = "properties.nom_barri",
       colorscale   = "YlOrRd",
       reversescale = !(var %in% c("canvi_absolut", "canvi_bcn")),
       marker       = list(opacity = 0.65, line = list(width = 0.8, color = "white")),
-      text         = paste0(dades$Nom_Barri, "<br>", var_lbl, ": ", fmt(dades$valor)),
+      text         = paste0(dades$Nom_Barri, "<br>", var_lbl, ": ", fmt(dades$valor_z)),
       hovertemplate = "%{text}<extra></extra>",
-      colorbar     = list(title = var_lbl)
+      colorbar     = if (var %in% pct_vars)
+                       list(title = var_lbl, ticksuffix = "%", tickformat = ".1f")
+                     else
+                       list(title = var_lbl)
     ) |>
       layout(
         mapbox = list(
